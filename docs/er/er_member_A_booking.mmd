@@ -1,0 +1,70 @@
+---
+title: Member A - Booking (shared tables shown for context)
+---
+erDiagram
+    booking {
+        int booking_id PK
+        int patient_id FK
+        int staff_id FK
+        int visit_id FK
+        date booking_date
+        time booking_time
+        smallint queue_no
+        text symptom
+        varchar status
+        timestamptz created_at
+    }
+    feedback {
+        int feedback_id PK
+        int patient_id FK
+        int booking_id FK
+        text message
+        timestamptz created_at
+    }
+    patient {
+        int patient_id PK
+        varchar hn
+        varchar national_id
+        varchar first_name
+        varchar last_name
+        date birth_date
+        char gender
+        char phone
+        varchar email
+        varchar address
+        varchar blood_type
+        text allergy_note
+        timestamptz created_at
+    }
+    staff {
+        int staff_id PK
+        varchar first_name
+        varchar last_name
+        text role
+        int department_id FK
+        varchar license_no
+        char phone
+        varchar email
+    }
+    department {
+        int department_id PK
+        varchar name
+        varchar location
+    }
+    visit {
+        int visit_id PK
+        int patient_id FK
+        int staff_id FK
+        varchar visit_type
+        timestamptz admit_date
+        timestamptz discharge_date
+        varchar status
+    }
+    department |o--o{ staff : "department_id"
+    patient ||--o{ visit : "patient_id"
+    staff |o--o{ visit : "staff_id"
+    patient ||--o{ booking : "patient_id"
+    staff ||--o{ booking : "staff_id"
+    visit |o--o{ booking : "visit_id"
+    patient ||--o{ feedback : "patient_id"
+    booking |o--o{ feedback : "booking_id"

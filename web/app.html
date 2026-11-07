@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ระบบโรงพยาบาล</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <header>
+    <strong>ระบบจัดการข้อมูลโรงพยาบาล</strong>
+    <nav id="nav">
+      <button data-tab="data" class="active">ข้อมูล (CRUD)</button>
+      <button data-tab="views">รายงาน (Views)</button>
+      <button data-tab="dash">Dashboard</button>
+      <button data-tab="chat">Chat</button>
+    </nav>
+    <button id="logout">ออกจากระบบ</button>
+  </header>
+  <main><section id="panel"></section></main>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

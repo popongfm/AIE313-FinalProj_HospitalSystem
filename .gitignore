@@ -1,0 +1,5 @@
+.superpowers/
+web/config.js
+.env*
+supabase/.env
+.pgdata/

@@ -1,0 +1,116 @@
+---
+title: Member B - Pharmacy and Dispensing (shared tables shown for context)
+---
+erDiagram
+    drug {
+        int drug_id PK
+        varchar generic_name
+        varchar trade_name
+        varchar dosage_form
+        varchar strength
+        varchar unit
+        boolean is_high_alert
+        varchar storage_condition
+    }
+    drug_lot {
+        int lot_id PK
+        int drug_id FK
+        varchar lot_number
+        date manufacture_date
+        date expiry_date
+        numeric cost_per_unit
+        int initial_quantity
+    }
+    prescription {
+        int prescription_id PK
+        int visit_id FK
+        int staff_id FK
+        timestamptz prescription_date
+        varchar status
+        numeric total_price
+    }
+    prescription_item {
+        int item_id PK
+        int prescription_id FK
+        int drug_id FK
+        varchar dosage
+        varchar route
+        varchar frequency
+        int quantity
+        int duration_days
+        text instruction
+    }
+    dispense_record {
+        int dispense_id PK
+        int item_id FK
+        int staff_id FK
+        int lot_id FK
+        timestamptz dispense_date
+        int dispensed_quantity
+        char status_code
+    }
+    inventory {
+        int inventory_id PK
+        int drug_id FK
+        int lot_id FK
+        varchar location
+        int quantity_on_hand
+        int reorder_point
+        timestamptz last_updated
+    }
+    drug_allergy_record {
+        int allergy_id PK
+        int patient_id FK
+        int drug_id FK
+        text reaction_details
+        varchar severity
+        timestamptz recorded_date
+    }
+    patient {
+        int patient_id PK
+        varchar hn
+        varchar national_id
+        varchar first_name
+        varchar last_name
+        date birth_date
+        char gender
+        char phone
+        varchar email
+        varchar address
+        varchar blood_type
+        text allergy_note
+        timestamptz created_at
+    }
+    staff {
+        int staff_id PK
+        varchar first_name
+        varchar last_name
+        text role
+        int department_id FK
+        varchar license_no
+        char phone
+        varchar email
+    }
+    visit {
+        int visit_id PK
+        int patient_id FK
+        int staff_id FK
+        varchar visit_type
+        timestamptz admit_date
+        timestamptz discharge_date
+        varchar status
+    }
+    visit ||--o{ prescription : "visit_id"
+    staff ||--o{ prescription : "staff_id"
+    patient ||--o{ drug_allergy_record : "patient_id"
+    patient ||--o{ visit : "patient_id"
+    staff |o--o{ visit : "staff_id"
+    drug ||--o{ drug_lot : "drug_id"
+    prescription ||--o{ prescription_item : "prescription_id"
+    drug ||--o{ prescription_item : "drug_id"
+    prescription_item ||--o{ dispense_record : "item_id"
+    staff ||--o{ dispense_record : "staff_id"
+    drug_lot ||--o{ dispense_record : "lot_id"
+    drug ||--o{ inventory : "drug_id"
+    drug_lot ||--o{ inventory : "lot_id"
+    drug ||--o{ drug_allergy_record : "drug_id"

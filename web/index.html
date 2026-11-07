@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>ระบบโรงพยาบาล - เข้าสู่ระบบ</title>
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+</head>
+<body>
+  <div class="auth card">
+    <h2>ระบบจัดการข้อมูลโรงพยาบาล</h2>
+    <form id="form">
+      <label for="email">อีเมล</label><input id="email" type="email" required autocomplete="username">
+      <label for="password">รหัสผ่าน</label><input id="password" type="password" required minlength="6" autocomplete="current-password">
+      <div id="err" class="err" role="alert"></div>
+      <div class="row">
+        <button class="primary" type="submit" id="login">เข้าสู่ระบบ</button>
+      </div>
+    </form>
+  </div>
+  <script type="module">
+    import { signIn } from './js/auth.js';
+    const $ = (id) => document.getElementById(id);
+    const err = (t) => { $('err').textContent = t || ''; };
+    async function run(fn, okMsg) {
+      err('');
+      const r = await fn($('email').value.trim(), $('password').value);
+      if (!r.ok) return err(r.error);
+      if (okMsg) return err(okMsg);
+      location.href = 'app.html';
+    }
+    $('form').addEventListener('submit', (e) => { e.preventDefault(); run(signIn); });
+  </script>
+</body>
+</html>

@@ -1,0 +1,1 @@
+-- No extra extensions required (gen_random_uuid is built in on PG13+).

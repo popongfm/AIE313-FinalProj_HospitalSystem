@@ -1,0 +1,102 @@
+---
+title: Member C - Medical Records (shared tables shown for context)
+---
+erDiagram
+    room {
+        int room_id PK
+        varchar room_no
+        varchar room_type
+        int department_id FK
+        int capacity
+    }
+    bed {
+        int bed_id PK
+        int room_id FK
+        varchar bed_no
+        varchar status
+    }
+    visit {
+        int visit_id PK
+        int patient_id FK
+        int staff_id FK
+        varchar visit_type
+        timestamptz admit_date
+        timestamptz discharge_date
+        varchar status
+    }
+    admission {
+        int admission_id PK
+        int visit_id FK
+        int bed_id FK
+        timestamptz assigned_date
+        timestamptz released_date
+    }
+    diagnosis {
+        int diagnosis_id PK
+        int visit_id FK
+        varchar icd_code
+        text description
+        timestamptz diagnosed_date
+    }
+    lab_result {
+        int lab_id PK
+        int visit_id FK
+        varchar test_name
+        varchar result_value
+        timestamptz test_date
+    }
+    insurance_coverage {
+        int insurance_id PK
+        int patient_id FK
+        varchar provider_name
+        varchar policy_no
+        varchar coverage_type
+    }
+    daily_charge {
+        int charge_id PK
+        int visit_id FK
+        date charge_date
+        varchar item_description
+        numeric amount
+    }
+    patient {
+        int patient_id PK
+        varchar hn
+        varchar national_id
+        varchar first_name
+        varchar last_name
+        date birth_date
+        char gender
+        char phone
+        varchar email
+        varchar address
+        varchar blood_type
+        text allergy_note
+        timestamptz created_at
+    }
+    staff {
+        int staff_id PK
+        varchar first_name
+        varchar last_name
+        text role
+        int department_id FK
+        varchar license_no
+        char phone
+        varchar email
+    }
+    department {
+        int department_id PK
+        varchar name
+        varchar location
+    }
+    department |o--o{ staff : "department_id"
+    department |o--o{ room : "department_id"
+    room ||--o{ bed : "room_id"
+    patient ||--o{ visit : "patient_id"
+    staff |o--o{ visit : "staff_id"
+    visit ||--o{ admission : "visit_id"
+    bed ||--o{ admission : "bed_id"
+    visit ||--o{ diagnosis : "visit_id"
+    visit ||--o{ lab_result : "visit_id"
+    patient ||--o{ insurance_coverage : "patient_id"
+    visit ||--o{ daily_charge : "visit_id"

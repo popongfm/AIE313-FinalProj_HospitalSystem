@@ -1,0 +1,214 @@
+---
+title: ER Diagram - Hospital Information System (merged, 21 tables)
+---
+erDiagram
+    admission {
+        int admission_id PK
+        int visit_id FK
+        int bed_id FK
+        timestamptz assigned_date
+        timestamptz released_date
+    }
+    bed {
+        int bed_id PK
+        int room_id FK
+        varchar bed_no
+        varchar status
+    }
+    booking {
+        int booking_id PK
+        int patient_id FK
+        int staff_id FK
+        int visit_id FK
+        date booking_date
+        time booking_time
+        smallint queue_no
+        text symptom
+        varchar status
+        timestamptz created_at
+    }
+    daily_charge {
+        int charge_id PK
+        int visit_id FK
+        date charge_date
+        varchar item_description
+        numeric amount
+    }
+    department {
+        int department_id PK
+        varchar name
+        varchar location
+    }
+    diagnosis {
+        int diagnosis_id PK
+        int visit_id FK
+        varchar icd_code
+        text description
+        timestamptz diagnosed_date
+    }
+    dispense_record {
+        int dispense_id PK
+        int item_id FK
+        int staff_id FK
+        int lot_id FK
+        timestamptz dispense_date
+        int dispensed_quantity
+        char status_code
+    }
+    drug {
+        int drug_id PK
+        varchar generic_name
+        varchar trade_name
+        varchar dosage_form
+        varchar strength
+        varchar unit
+        boolean is_high_alert
+        varchar storage_condition
+    }
+    drug_allergy_record {
+        int allergy_id PK
+        int patient_id FK
+        int drug_id FK
+        text reaction_details
+        varchar severity
+        timestamptz recorded_date
+    }
+    drug_lot {
+        int lot_id PK
+        int drug_id FK
+        varchar lot_number
+        date manufacture_date
+        date expiry_date
+        numeric cost_per_unit
+        int initial_quantity
+    }
+    feedback {
+        int feedback_id PK
+        int patient_id FK
+        int booking_id FK
+        text message
+        timestamptz created_at
+    }
+    insurance_coverage {
+        int insurance_id PK
+        int patient_id FK
+        varchar provider_name
+        varchar policy_no
+        varchar coverage_type
+    }
+    inventory {
+        int inventory_id PK
+        int drug_id FK
+        int lot_id FK
+        varchar location
+        int quantity_on_hand
+        int reorder_point
+        timestamptz last_updated
+    }
+    lab_result {
+        int lab_id PK
+        int visit_id FK
+        varchar test_name
+        varchar result_value
+        timestamptz test_date
+    }
+    patient {
+        int patient_id PK
+        varchar hn
+        varchar national_id
+        varchar first_name
+        varchar last_name
+        date birth_date
+        char gender
+        char phone
+        varchar email
+        varchar address
+        varchar blood_type
+        text allergy_note
+        timestamptz created_at
+    }
+    prescription {
+        int prescription_id PK
+        int visit_id FK
+        int staff_id FK
+        timestamptz prescription_date
+        varchar status
+        numeric total_price
+    }
+    prescription_item {
+        int item_id PK
+        int prescription_id FK
+        int drug_id FK
+        varchar dosage
+        varchar route
+        varchar frequency
+        int quantity
+        int duration_days
+        text instruction
+    }
+    profiles {
+        uuid user_id PK,FK
+        text role
+        int patient_id FK
+        int staff_id FK
+    }
+    room {
+        int room_id PK
+        varchar room_no
+        varchar room_type
+        int department_id FK
+        int capacity
+    }
+    staff {
+        int staff_id PK
+        varchar first_name
+        varchar last_name
+        text role
+        int department_id FK
+        varchar license_no
+        char phone
+        varchar email
+    }
+    visit {
+        int visit_id PK
+        int patient_id FK
+        int staff_id FK
+        varchar visit_type
+        timestamptz admit_date
+        timestamptz discharge_date
+        varchar status
+    }
+    auth_users {
+        uuid id PK
+    }
+    department |o--o{ staff : "department_id"
+    visit ||--o{ prescription : "visit_id"
+    patient |o--o{ profiles : "patient_id"
+    staff |o--o{ profiles : "staff_id"
+    department |o--o{ room : "department_id"
+    room ||--o{ bed : "room_id"
+    staff ||--o{ prescription : "staff_id"
+    patient ||--o{ drug_allergy_record : "patient_id"
+    patient ||--o{ visit : "patient_id"
+    staff |o--o{ visit : "staff_id"
+    visit ||--o{ admission : "visit_id"
+    bed ||--o{ admission : "bed_id"
+    visit ||--o{ diagnosis : "visit_id"
+    visit ||--o{ lab_result : "visit_id"
+    patient ||--o{ insurance_coverage : "patient_id"
+    visit ||--o{ daily_charge : "visit_id"
+    patient ||--o{ booking : "patient_id"
+    staff ||--o{ booking : "staff_id"
+    visit |o--o{ booking : "visit_id"
+    patient ||--o{ feedback : "patient_id"
+    booking |o--o{ feedback : "booking_id"
+    drug ||--o{ drug_lot : "drug_id"
+    prescription ||--o{ prescription_item : "prescription_id"
+    drug ||--o{ prescription_item : "drug_id"
+    prescription_item ||--o{ dispense_record : "item_id"
+    staff ||--o{ dispense_record : "staff_id"
+    drug_lot ||--o{ dispense_record : "lot_id"
+    drug ||--o{ inventory : "drug_id"
+    drug_lot ||--o{ inventory : "lot_id"
+    drug ||--o{ drug_allergy_record : "drug_id"
+    auth_users ||--o| profiles : "user_id"
