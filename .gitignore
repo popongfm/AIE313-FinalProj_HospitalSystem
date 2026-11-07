@@ -3,3 +3,5 @@ web/config.js
 .env*
 supabase/.env
 .pgdata/
+.DS_Store
+supabase/.DS_Store
