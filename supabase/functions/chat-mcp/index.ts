@@ -20,6 +20,9 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const { data: auth } = await admin.auth.getUser(token);
   if (!auth?.user) return json({ error: 'กรุณาเข้าสู่ระบบก่อนใช้งาน' }, 401);
+  // Signed in is not enough: only accounts an admin linked to a staff/admin profile may query (same rule as is_app_user()).
+  const { data: prof } = await admin.from('profiles').select('role').eq('user_id', auth.user.id).maybeSingle();
+  if (!prof || prof.role === 'patient') return json({ error: 'บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, 403);
 
   let question = '';
   try { question = (await req.json()).question; } catch { /* handled as empty question */ }

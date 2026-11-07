@@ -43,3 +43,10 @@ CREATE TABLE profiles (
     OR (role = 'patient' AND patient_id IS NOT NULL AND staff_id IS NULL)
     OR (role IN ('doctor','pharmacist','nurse') AND staff_id IS NOT NULL AND patient_id IS NULL))
 );
+
+-- Only users an admin has linked to a non-patient profile may use the app (open sign-up must not grant access).
+-- Defined here (not in 06_rls.sql) because the views in 05_views.sql call it.
+CREATE FUNCTION is_app_user() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
+$$ SELECT EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role <> 'patient') $$;
+REVOKE ALL ON FUNCTION is_app_user() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION is_app_user() TO authenticated, service_role;

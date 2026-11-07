@@ -23,19 +23,28 @@ GRANT USAGE ON SCHEMA public TO chat_reader;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM chat_reader;
 GRANT SELECT ON v_booking_queue_today, v_doctor_workload, v_feedback_summary, v_bed_occupancy, v_visit_billing,
                 v_top_diagnosis, v_pharmacist_screening_queue, v_inventory_stock_status, v_drug_cost_summary TO chat_reader;
+-- the views' access check calls is_app_user(); Postgres checks EXECUTE even when current_user = chat_reader short-circuits it
+GRANT EXECUTE ON FUNCTION is_app_user() TO chat_reader;
 
 -- NOTE: statement_timeout cannot be (re)armed from inside a function, so long-running queries are prevented by
 -- sqlGuard (no functions such as pg_sleep, forced LIMIT 100) and, optionally, a role-level timeout set once by an admin:
 --   ALTER ROLE service_role SET statement_timeout = '10s';   -- PostgREST applies per-role settings per request
 -- SECURITY DEFINER and OWNED BY chat_reader: the query runs with chat_reader's privileges (9 views only) and, because
 -- Postgres forbids changing "role" inside a security-definer function, it cannot switch itself to service_role.
-CREATE FUNCTION run_readonly_query(q text) RETURNS jsonb
+-- RETURNS json (not jsonb): jsonb re-sorts object keys by length, so the chat table's columns came back in a different
+-- order from the SELECT; json keeps them as written.
+CREATE FUNCTION run_readonly_query(q text) RETURNS json
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE result jsonb;
+DECLARE result json;
 BEGIN
-  EXECUTE format('SELECT coalesce(jsonb_agg(t), ''[]''::jsonb) FROM (%s) t', q) INTO result;
+  EXECUTE format('SELECT coalesce(json_agg(t), ''[]''::json) FROM (%s) t', q) INTO result;
   RETURN result;
 END $$;
+-- On Supabase "postgres" is not a superuser: giving the function to chat_reader requires being able to SET ROLE to it and
+-- chat_reader holding CREATE on the schema. Grant both just for the ALTER, then take CREATE back.
+GRANT chat_reader TO CURRENT_USER;
+GRANT CREATE ON SCHEMA public TO chat_reader;
 ALTER FUNCTION run_readonly_query(text) OWNER TO chat_reader;
+REVOKE CREATE ON SCHEMA public FROM chat_reader;
 REVOKE ALL ON FUNCTION run_readonly_query(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION run_readonly_query(text) TO service_role;

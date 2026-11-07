@@ -51,6 +51,13 @@ CREATE TABLE profiles (
     OR (role IN ('doctor','pharmacist','nurse') AND staff_id IS NOT NULL AND patient_id IS NULL))
 );
 
+-- Only users an admin has linked to a non-patient profile may use the app (open sign-up must not grant access).
+-- Defined here (not in 06_rls.sql) because the views in 05_views.sql call it.
+CREATE FUNCTION is_app_user() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
+$$ SELECT EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role <> 'patient') $$;
+REVOKE ALL ON FUNCTION is_app_user() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION is_app_user() TO authenticated, service_role;
+
 -- ===== 02_records.sql =====
 -- Medical records module (member C): rooms/beds, visits (hub), admissions, diagnosis, labs, insurance, charges.
 CREATE TABLE room (
@@ -243,6 +250,10 @@ CREATE TABLE drug_allergy_record (
 
 -- ===== 05_views.sql =====
 -- 9 chat-visible views (owner-rights so chat_reader needs no table access); none expose national_id/phone/email/address/birth_date.
+-- Owner-rights views bypass the tables' RLS, so each view repeats the access rule itself:
+--   (current_user NOT IN ('anon', 'authenticated') OR is_app_user())
+-- API users (role authenticated) must be linked staff/admin; chat_reader (chat RPC), service_role and the owner pass.
+-- Keep it inline: inside a SECURITY DEFINER wrapper current_user would be the owner and the check would always pass.
 -- ===== Member A: booking =====
 CREATE VIEW v_booking_queue_today AS
 SELECT b.booking_id, b.queue_no, b.booking_time, p.hn, p.first_name AS patient_first_name,
@@ -251,7 +262,7 @@ FROM booking b
 JOIN patient p ON p.patient_id = b.patient_id
 JOIN staff s ON s.staff_id = b.staff_id
 LEFT JOIN department d ON d.department_id = s.department_id
-WHERE b.booking_date = CURRENT_DATE
+WHERE b.booking_date = CURRENT_DATE AND (current_user NOT IN ('anon', 'authenticated') OR is_app_user())
 ORDER BY s.staff_id, b.queue_no;
 
 CREATE VIEW v_doctor_workload AS
@@ -260,6 +271,7 @@ SELECT s.staff_id, s.first_name || ' ' || s.last_name AS doctor_name, d.name AS 
 FROM booking b
 JOIN staff s ON s.staff_id = b.staff_id
 LEFT JOIN department d ON d.department_id = s.department_id
+WHERE (current_user NOT IN ('anon', 'authenticated') OR is_app_user())
 GROUP BY s.staff_id, s.first_name, s.last_name, d.name, b.status;
 
 CREATE VIEW v_feedback_summary AS
@@ -269,6 +281,7 @@ FROM feedback f
 JOIN booking b ON b.booking_id = f.booking_id
 JOIN staff s ON s.staff_id = b.staff_id
 LEFT JOIN department d ON d.department_id = s.department_id
+WHERE (current_user NOT IN ('anon', 'authenticated') OR is_app_user())
 GROUP BY s.staff_id, s.first_name, s.last_name, d.name;
 
 -- ===== Member C: records =====
@@ -281,6 +294,7 @@ SELECT r.room_id, r.room_no, r.room_type, d.name AS department,
 FROM room r
 LEFT JOIN bed b ON b.room_id = r.room_id
 LEFT JOIN department d ON d.department_id = r.department_id
+WHERE (current_user NOT IN ('anon', 'authenticated') OR is_app_user())
 GROUP BY r.room_id, r.room_no, r.room_type, d.name;
 
 CREATE VIEW v_visit_billing AS
@@ -291,12 +305,14 @@ JOIN visit v ON v.visit_id = c.visit_id
 JOIN patient p ON p.patient_id = v.patient_id
 LEFT JOIN staff s ON s.staff_id = v.staff_id
 LEFT JOIN department d ON d.department_id = s.department_id
+WHERE (current_user NOT IN ('anon', 'authenticated') OR is_app_user())
 GROUP BY v.visit_id, p.hn, p.first_name, v.visit_type, d.name, to_char(c.charge_date, 'YYYY-MM');
 
 CREATE VIEW v_top_diagnosis AS
 SELECT icd_code, MAX(description) AS description, COUNT(*) AS case_count,
        RANK() OVER (ORDER BY COUNT(*) DESC) AS rank_no
 FROM diagnosis
+WHERE (current_user NOT IN ('anon', 'authenticated') OR is_app_user())
 GROUP BY icd_code;
 
 -- ===== Member B: pharmacy =====
@@ -312,7 +328,7 @@ JOIN patient p ON p.patient_id = v.patient_id
 JOIN staff s ON s.staff_id = pr.staff_id
 JOIN prescription_item i ON i.prescription_id = pr.prescription_id
 JOIN drug d ON d.drug_id = i.drug_id
-WHERE pr.status IN ('Pending', 'Screened');
+WHERE pr.status IN ('Pending', 'Screened') AND (current_user NOT IN ('anon', 'authenticated') OR is_app_user());
 
 CREATE VIEW v_inventory_stock_status AS
 SELECT inv.inventory_id, d.generic_name, d.trade_name, l.lot_number, l.expiry_date, inv.location,
@@ -322,7 +338,8 @@ SELECT inv.inventory_id, d.generic_name, d.trade_name, l.lot_number, l.expiry_da
             ELSE 'NORMAL' END AS stock_status
 FROM inventory inv
 JOIN drug d ON d.drug_id = inv.drug_id
-JOIN drug_lot l ON l.lot_id = inv.lot_id;
+JOIN drug_lot l ON l.lot_id = inv.lot_id
+WHERE (current_user NOT IN ('anon', 'authenticated') OR is_app_user());
 
 CREATE VIEW v_drug_cost_summary AS
 WITH presc AS (
@@ -341,7 +358,8 @@ SELECT d.drug_id, d.generic_name, d.trade_name,
        COALESCE(disp.dispensed_cost, 0) AS dispensed_cost
 FROM drug d
 LEFT JOIN presc ON presc.drug_id = d.drug_id
-LEFT JOIN disp ON disp.drug_id = d.drug_id;
+LEFT JOIN disp ON disp.drug_id = d.drug_id
+WHERE (current_user NOT IN ('anon', 'authenticated') OR is_app_user());
 
 -- ===== 06_rls.sql =====
 -- Row Level Security: anon gets nothing; linked staff users (profiles) get the app tables and views.
@@ -352,11 +370,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
--- Only users an admin has linked to a non-patient profile may use the app tables (open sign-up must not grant access).
-CREATE FUNCTION is_app_user() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
-$$ SELECT EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role <> 'patient') $$;
-REVOKE ALL ON FUNCTION is_app_user() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION is_app_user() TO authenticated, service_role;
+-- is_app_user() is defined in 01_core.sql (the views in 05_views.sql use it too).
 
 DO $$
 DECLARE t text;
@@ -399,19 +413,28 @@ GRANT USAGE ON SCHEMA public TO chat_reader;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM chat_reader;
 GRANT SELECT ON v_booking_queue_today, v_doctor_workload, v_feedback_summary, v_bed_occupancy, v_visit_billing,
                 v_top_diagnosis, v_pharmacist_screening_queue, v_inventory_stock_status, v_drug_cost_summary TO chat_reader;
+-- the views' access check calls is_app_user(); Postgres checks EXECUTE even when current_user = chat_reader short-circuits it
+GRANT EXECUTE ON FUNCTION is_app_user() TO chat_reader;
 
 -- NOTE: statement_timeout cannot be (re)armed from inside a function, so long-running queries are prevented by
 -- sqlGuard (no functions such as pg_sleep, forced LIMIT 100) and, optionally, a role-level timeout set once by an admin:
 --   ALTER ROLE service_role SET statement_timeout = '10s';   -- PostgREST applies per-role settings per request
 -- SECURITY DEFINER and OWNED BY chat_reader: the query runs with chat_reader's privileges (9 views only) and, because
 -- Postgres forbids changing "role" inside a security-definer function, it cannot switch itself to service_role.
-CREATE FUNCTION run_readonly_query(q text) RETURNS jsonb
+-- RETURNS json (not jsonb): jsonb re-sorts object keys by length, so the chat table's columns came back in a different
+-- order from the SELECT; json keeps them as written.
+CREATE FUNCTION run_readonly_query(q text) RETURNS json
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE result jsonb;
+DECLARE result json;
 BEGIN
-  EXECUTE format('SELECT coalesce(jsonb_agg(t), ''[]''::jsonb) FROM (%s) t', q) INTO result;
+  EXECUTE format('SELECT coalesce(json_agg(t), ''[]''::json) FROM (%s) t', q) INTO result;
   RETURN result;
 END $$;
+-- On Supabase "postgres" is not a superuser: giving the function to chat_reader requires being able to SET ROLE to it and
+-- chat_reader holding CREATE on the schema. Grant both just for the ALTER, then take CREATE back.
+GRANT chat_reader TO CURRENT_USER;
+GRANT CREATE ON SCHEMA public TO chat_reader;
 ALTER FUNCTION run_readonly_query(text) OWNER TO chat_reader;
+REVOKE CREATE ON SCHEMA public FROM chat_reader;
 REVOKE ALL ON FUNCTION run_readonly_query(text) FROM PUBLIC, anon, authenticated;
 GRANT EXECUTE ON FUNCTION run_readonly_query(text) TO service_role;

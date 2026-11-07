@@ -35,7 +35,12 @@ export async function mountChat(el) {
     let entry;
     try {
       const { data, error } = await supabase.functions.invoke(window.APP_CONFIG?.CHAT_FUNCTION || 'chat-mcp', { body: { question } });
-      entry = error || !data ? { role: 'bot', error: 'เชื่อมต่อระบบ Chat ไม่ได้ กรุณาลองใหม่อีกครั้ง' } : { role: 'bot', ...data, error: data.error };
+      // 401/403 replies carry a Thai message in { error } (e.g. account not yet linked by an admin); show it instead of the generic one
+      let serverMsg = null;
+      if (error && error.context && typeof error.context.json === 'function') {
+        try { serverMsg = (await error.context.json()).error || null; } catch { /* not JSON */ }
+      }
+      entry = error || !data ? { role: 'bot', error: serverMsg || 'เชื่อมต่อระบบ Chat ไม่ได้ กรุณาลองใหม่อีกครั้ง' } : { role: 'bot', ...data, error: data.error };
     } catch { entry = { role: 'bot', error: 'เชื่อมต่อระบบ Chat ไม่ได้ กรุณาลองใหม่อีกครั้ง' }; }
     history[history.indexOf(pending)] = entry;
     send.disabled = input.disabled = false; render(); input.focus();

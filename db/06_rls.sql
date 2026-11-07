@@ -6,11 +6,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon;
 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
--- Only users an admin has linked to a non-patient profile may use the app tables (open sign-up must not grant access).
-CREATE FUNCTION is_app_user() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
-$$ SELECT EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role <> 'patient') $$;
-REVOKE ALL ON FUNCTION is_app_user() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION is_app_user() TO authenticated, service_role;
+-- is_app_user() is defined in 01_core.sql (the views in 05_views.sql use it too).
 
 DO $$
 DECLARE t text;

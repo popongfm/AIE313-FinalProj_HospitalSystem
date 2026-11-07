@@ -1,6 +1,6 @@
 -- Task 7: chat_logs, chat_reader role, run_readonly_query RPC.
 DO $$
-DECLARE v text; r jsonb; n int;
+DECLARE v text; n int;
   names text[] := ARRAY['v_booking_queue_today','v_doctor_workload','v_feedback_summary','v_bed_occupancy','v_visit_billing',
                         'v_top_diagnosis','v_pharmacist_screening_queue','v_inventory_stock_status','v_drug_cost_summary'];
 BEGIN
@@ -10,16 +10,25 @@ BEGIN
   END LOOP;
   ASSERT NOT has_table_privilege('chat_reader', 'public.patient', 'SELECT'), 'chat_reader must not read patient';
   ASSERT NOT has_table_privilege('chat_reader', 'public.chat_logs', 'SELECT'), 'chat_reader must not read chat_logs';
+  ASSERT pg_get_userbyid((SELECT proowner FROM pg_proc WHERE proname = 'run_readonly_query')) = 'chat_reader',
+         'run_readonly_query must be owned by chat_reader';
+  ASSERT NOT has_schema_privilege('chat_reader', 'public', 'CREATE'), 'chat_reader must not keep CREATE on public';
 END $$;
 
 SET LOCAL ROLE service_role;
 DO $$
-DECLARE r jsonb;
+DECLARE r json;
 BEGIN
   r := run_readonly_query('select * from v_doctor_workload limit 1');
-  ASSERT jsonb_typeof(r) = 'array' AND jsonb_array_length(r) = 1, 'view query should return 1 row';
+  ASSERT json_typeof(r) = 'array' AND json_array_length(r) = 1, 'view query should return 1 row';
+  -- columns must come back in SELECT order (jsonb would re-sort them: status, department, doctor_name, booking_count)
+  r := run_readonly_query('select doctor_name, department, status, booking_count from v_doctor_workload limit 1');
+  ASSERT (SELECT array_agg(k ORDER BY n) FROM json_object_keys(r->0) WITH ORDINALITY AS x(k, n))
+         = ARRAY['doctor_name','department','status','booking_count'], 'columns must keep SELECT order';
+  -- the views' access check must let the chat role through
+  ASSERT json_array_length(run_readonly_query('select * from v_pharmacist_screening_queue')) >= 1, 'chat must read view rows';
   ASSERT current_user = 'service_role', 'caller role must be restored, got ' || current_user;
-  ASSERT run_readonly_query('select * from v_doctor_workload where false') = '[]'::jsonb, 'empty result must be []';
+  ASSERT run_readonly_query('select * from v_doctor_workload where false')::text = '[]', 'empty result must be []';
   BEGIN
     PERFORM run_readonly_query('select * from patient');
     RAISE EXCEPTION 'reading a base table must fail';

@@ -5,6 +5,7 @@ Plan: `docs/superpowers/plans/` · ER diagrams: `docs/er/` · test cases: `docs/
 
 ## Deploy checklist (one time)
 1. **Supabase project** → SQL editor: run `schema.sql`, then `seed.sql` (21→22 tables, 9 views, RLS, `chat_reader` role, `run_readonly_query`).
+   If an older `schema.sql` was run before (it stopped at `ALTER FUNCTION ... OWNER TO chat_reader`, or left `run_readonly_query` owned by `postgres`), start from an empty project or run `DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres, anon, authenticated, service_role;` first.
 2. Auth → **disable "Allow new users to sign up"**, then create users by hand (Auth → Users). Link each user to a profile as an admin, otherwise RLS shows them nothing:
    `INSERT INTO profiles(user_id, role) VALUES ('<auth user uuid>', 'admin');`
    **Required:** `ALTER ROLE service_role SET statement_timeout = '10s';` (query timeout for the chat function).
