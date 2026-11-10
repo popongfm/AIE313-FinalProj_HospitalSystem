@@ -1,0 +1,198 @@
+# CI: every pull request and every push to main runs all test suites.
+# CD: after everything passes on main, the two chat Edge Functions are deployed to Supabase
+#     (only when the SUPABASE_ACCESS_TOKEN secret and SUPABASE_PROJECT_REF variable are set).
+# The web app is deployed by Vercel's Git integration; the database schema is applied by hand (see README).
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash  # explicit bash = -eo pipefail, so a failing command before `| tee` still fails the step
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  DENO_VERSION: v2.9.6
+  NODE_VERSION: '22'
+  SUPABASE_CLI_VERSION: 2.121.0
+  PLAYWRIGHT_VERSION: 1.63.0
+
+jobs:
+  static:
+    name: Static checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: No keys or tokens committed
+        run: bash scripts/check-secrets.sh
+      - name: schema.sql and seed.sql match db/
+        run: |
+          bash db/build_schema.sh
+          git diff --exit-code -- schema.sql seed.sql || { echo "::error::schema.sql/seed.sql are out of date. Run: bash db/build_schema.sh"; exit 1; }
+      - name: seed.sql matches its generator
+        run: |
+          python3 db/seed/generate_seed.py --seed 313 > "$RUNNER_TEMP/seed.sql"
+          cmp -s "$RUNNER_TEMP/seed.sql" db/seed/seed.sql || { echo "::error::db/seed/seed.sql differs from generate_seed.py --seed 313"; exit 1; }
+
+  db:
+    name: Database tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: pw
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: '5432'
+      PGUSER: postgres
+      PGPASSWORD: pw
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - name: SQL test suite (db/tests)
+        run: bash db/tests/run_tests.sh
+      - name: Analysis queries cover the brief and return rows
+        run: python3 analysis/check_coverage.py analysis/analysis_queries.sql --db hospital_test
+      - name: Chat prompt and view catalog match the views
+        run: |
+          python3 supabase/functions/chat-mcp/gen_view_catalog.py hospital_test > supabase/functions/chat-mcp/viewCatalog.ts
+          python3 supabase/functions/chat/gen_schema_prompt.py hospital_test > supabase/functions/chat/schemaPrompt.ts
+          git diff --exit-code -- supabase/functions || { echo "::error::Views changed but viewCatalog.ts/schemaPrompt.ts were not regenerated (see README)"; exit 1; }
+      - name: Documented chat cases (Text-to-SQL)
+        working-directory: supabase/functions/chat
+        run: deno run --allow-run --allow-env cases.ts hospital_test | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Documented chat cases (MCP)
+        working-directory: supabase/functions/chat-mcp
+        run: deno run --allow-run --allow-env cases.ts hospital_test | tee -a "$GITHUB_STEP_SUMMARY"
+
+  functions:
+    name: Edge Function tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: ${{ env.DENO_VERSION }}
+      - name: chat (Text-to-SQL)
+        working-directory: supabase/functions/chat
+        run: |
+          deno check index.ts
+          deno test --allow-env --allow-read
+      - name: chat-mcp
+        working-directory: supabase/functions/chat-mcp
+        run: |
+          deno check index.ts
+          deno test --allow-env --allow-read
+
+  web:
+    name: Web tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+      - name: Unit tests
+        run: node --test web/tests/*.test.mjs scripts/*.test.mjs
+      - name: Install Playwright
+        run: |
+          npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@$PLAYWRIGHT_VERSION"
+          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+      - name: Browser smoke test
+        run: PLAYWRIGHT_PATH="$RUNNER_TEMP/pw/node_modules/playwright" node web/tests/smoke.mjs
+
+  supabase-e2e:
+    name: Supabase e2e
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: tests/e2e/package-lock.json
+      - uses: supabase/setup-cli@v1
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - name: Start local Supabase (Postgres, Auth, REST, gateway, Edge Runtime)
+        run: |
+          [ -f supabase/config.toml ] || supabase init
+          supabase start -x realtime,storage-api,imgproxy,mailpit,postgres-meta,studio,logflare,vector,supavisor
+          supabase status -o env | sed -E 's/^([A-Z_]+)="(.*)"$/\1=\2/' | grep -E '^(API_URL|DB_URL|ANON_KEY|SERVICE_ROLE_KEY|JWT_SECRET)=' >> "$GITHUB_ENV"
+      - name: Apply schema.sql and seed.sql as the postgres role (same as the SQL editor)
+        run: |
+          command -v psql >/dev/null || { sudo apt-get update -q && sudo apt-get install -yq postgresql-client; }
+          psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -c "$(cat schema.sql)"
+          psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -c "$(cat seed.sql)"
+          psql "$DB_URL" -X -q -v ON_ERROR_STOP=1 -c "ALTER ROLE service_role SET statement_timeout = '10s';" -c "NOTIFY pgrst, 'reload schema';"
+      - name: Serve both chat functions against a mock LLM
+        run: |
+          printf 'GROQ_API_KEY=ci-mock\nLLM_BASE_URL=http://host.docker.internal:9100\n' > "$RUNNER_TEMP/functions.env"
+          nohup supabase functions serve --env-file "$RUNNER_TEMP/functions.env" > "$RUNNER_TEMP/serve.log" 2>&1 &
+          for fn in chat chat-mcp; do
+            for i in $(seq 1 60); do
+              code=$(curl -s -m 60 -o /dev/null -w '%{http_code}' -X OPTIONS "$API_URL/functions/v1/$fn" || true)
+              [ "$code" = 200 ] && { echo "$fn ready"; break; }
+              [ "$i" = 60 ] && { echo "::error::$fn did not start (last HTTP $code)"; cat "$RUNNER_TEMP/serve.log"; exit 1; }
+              sleep 3
+            done
+          done
+      - name: Install e2e dependencies
+        run: npm ci --prefix tests/e2e --no-audit --no-fund
+      - name: End-to-end tests
+        run: node tests/e2e/supabase.e2e.mjs
+        env:
+          MOCK_LLM_PORT: '9100'
+      - name: Function logs
+        if: failure()
+        run: cat "$RUNNER_TEMP/serve.log" || true
+
+  deploy-functions:
+    name: Deploy Edge Functions
+    needs: [static, db, functions, web, supabase-e2e]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+    concurrency:
+      group: deploy-functions
+      cancel-in-progress: false
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - name: Skip when Supabase deploy is not configured
+        if: env.SUPABASE_ACCESS_TOKEN == '' || env.SUPABASE_PROJECT_REF == ''
+        run: echo "::notice::Skipped deploy. Add secret SUPABASE_ACCESS_TOKEN and variable SUPABASE_PROJECT_REF to enable it."
+      - uses: actions/checkout@v4
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+      - uses: supabase/setup-cli@v1
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+        with:
+          version: ${{ env.SUPABASE_CLI_VERSION }}
+      - name: Deploy chat-mcp and chat
+        if: env.SUPABASE_ACCESS_TOKEN != '' && env.SUPABASE_PROJECT_REF != ''
+        run: |
+          supabase functions deploy chat-mcp --project-ref "$SUPABASE_PROJECT_REF"
+          supabase functions deploy chat --project-ref "$SUPABASE_PROJECT_REF"
