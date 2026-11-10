@@ -1,20 +1,21 @@
 import { requireSession, signOut, getAccess } from './auth.js';
+import { tabsFor } from './roleUi.js';
 const mounts = {
   data:  async (el, access) => (await import('./crud.js')).mountCrudPage(el, access),
   views: async (el) => (await import('./views.js')).mountViewsPage(el),
-  dash:  async (el) => (await import('./dashboard.js')).mountDashboard(el),
+  dash:  async (el, access) => (await import('./dashboard.js')).mountDashboard(el, access),
   chat:  async (el) => (await import('./chat.js')).mountChat(el),
 };
 const HEADINGS = {
   data:  ['ข้อมูลในระบบ', 'เพิ่ม แก้ไข และลบข้อมูลผู้ป่วย การจองคิว การเข้ารับบริการ ใบสั่งยา ยา และสต็อกยา'],
   views: ['รายงาน', 'รายงาน 10 ชุดจากฐานข้อมูล ไม่แสดงเลขบัตรประชาชน เบอร์โทร หรืออีเมลของผู้ป่วย'],
-  dash:  ['Dashboard', 'ภาพรวมการจองคิวของแพทย์ ค่ารักษารายเดือน และยาที่ต่ำกว่าจุดสั่งซื้อ'],
+  dash:  ['Dashboard', 'กราฟตามหน้าที่ของบัญชีนี้ ผู้ดูแลระบบเห็นทุกกราฟ'],
   chat:  ['ผู้ช่วย AI', 'ถามเป็นภาษาไทยหรืออังกฤษ ทุกคำตอบแสดง SQL และตารางข้อมูลที่ใช้'],
 };
-// patient accounts see only their own records (RLS); the headings say so
+// patient accounts see only their own records (RLS) and have no reports tab; the headings say so
 const PATIENT_HEADINGS = {
   data:  ['ข้อมูลของฉัน', 'ดูประวัติการรักษาและใบสั่งยาของคุณ จองหรือยกเลิกคิว และแก้เบอร์โทร อีเมล ที่อยู่'],
-  views: ['รายงาน', 'รายงานที่มีข้อมูลรายคน (คิววันนี้ นัดหมาย ค่ารักษา ใบสั่งยา) แสดงเฉพาะของคุณ รายงานภาพรวมแสดงทั้งโรงพยาบาล'],
+  dash:  ['ภาพรวมของฉัน', 'ค่ารักษารายเดือนของคุณ'],
   chat:  ['ผู้ช่วย AI', 'ถามเกี่ยวกับคิว นัดหมาย ค่ารักษา หรือใบสั่งยาของคุณ คำตอบมาจากข้อมูลของคุณเท่านั้น'],
 };
 // app.html#chat etc. opens that tab; the landing page's shortcuts link here, and the tab survives the sign-in detour.
@@ -32,7 +33,11 @@ if (!access.linked) {
   note.textContent = 'บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน จึงยังไม่เห็นข้อมูล กรุณาติดต่อผู้ดูแลระบบเพื่ออนุมัติ';
   panel.before(note);
 }
+// tabs this account may open (patients: no reports); the others are hidden and ignored, also when asked for by #hash
+const tabs = tabsFor(access);
+document.querySelectorAll('#nav button').forEach((b) => { b.hidden = !tabs.includes(b.dataset.tab); });
 async function show(tab) {
+  if (!tabs.includes(tab)) return;
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
   const [title, desc] = (access.patient && PATIENT_HEADINGS[tab]) || HEADINGS[tab];
   document.getElementById('page-title').textContent = title;
@@ -44,12 +49,12 @@ async function show(tab) {
 }
 document.getElementById('nav').addEventListener('click', (e) => {
   const tab = e.target.dataset.tab;
-  if (!tab) return;
+  if (!tab || !tabs.includes(tab)) return;   // a hidden tab: leave the URL and the page as they are
   history.replaceState(null, '', '#' + tab);   // a reload keeps the current tab
   show(tab);
 });
 document.getElementById('logout').addEventListener('click', async () => { await signOut(); location.href = 'index.html'; });
-show(wanted || 'data');
+show(tabs.includes(wanted) ? wanted : 'data');
 }
 if (wanted) store((s) => s.setItem(NEXT_KEY, wanted));   // used by index.html if we get sent to sign in
 const session = await requireSession();

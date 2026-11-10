@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coerceRow, tableModel, pivot, sumBy } from '../js/helpers.js';
+import { coerceRow, tableModel, pivot, sumBy, countDistinctBy } from '../js/helpers.js';
 import { TABLES, PATIENT_TABLES } from '../js/tables.js';
 
 test('coerceRow trims text, converts numbers, nulls blank optionals', () => {
@@ -46,4 +46,9 @@ test('patient tables: only the four own-record tables, and only the actions the 
 test('coerceRow converts a numeric select (doctor id) to a number', () => {
   const { row, missing } = coerceRow(PATIENT_TABLES.booking, { staff_id: '3', booking_date: '2026-12-01', booking_time: '10:00', symptom: '' });
   assert.deepEqual(missing, []); assert.equal(row.staff_id, 3); assert.equal(row.symptom, null);
+});
+test('countDistinctBy counts each id once per group', () => {
+  const rows = [{ s: 'Pending', id: 1 }, { s: 'Pending', id: 1 }, { s: 'Screened', id: 2 }, { s: 'Pending', id: 3 }];
+  assert.deepEqual(countDistinctBy(rows, 's', 'id'), [{ key: 'Pending', count: 2 }, { key: 'Screened', count: 1 }]);
+  assert.deepEqual(countDistinctBy([], 's', 'id'), []);
 });

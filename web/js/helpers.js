@@ -33,3 +33,12 @@ export function sumBy(rows, keys, valueKey) {
   }
   return [...out.values()];
 }
+// [{ key, count }] where count is the number of distinct idKey values per groupKey, groups in first-seen order
+export function countDistinctBy(rows, groupKey, idKey) {
+  const groups = new Map();
+  for (const r of rows) {
+    if (!groups.has(r[groupKey])) groups.set(r[groupKey], new Set());
+    groups.get(r[groupKey]).add(r[idKey]);
+  }
+  return [...groups].map(([key, ids]) => ({ key, count: ids.size }));
+}
