@@ -2,14 +2,19 @@
 <html lang="th">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>ระบบโรงพยาบาล</title>
+  <title>โรงพยาบาล AIE313</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Serif+Thai:wght@500;600&display=swap">
   <link rel="stylesheet" href="css/app.css">
   <script src="config.js"></script>
 </head>
-<body>
-  <header>
-    <strong>ระบบจัดการข้อมูลโรงพยาบาล</strong>
-    <nav id="nav">
+<body class="app">
+  <header class="app-bar">
+    <a class="brand" href="app.html" aria-label="โรงพยาบาล AIE313">
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z"/></svg>
+      <span class="brand-name">โรงพยาบาล AIE313<small>ระบบสารสนเทศโรงพยาบาล</small></span>
+    </a>
+    <nav id="nav" aria-label="เมนูระบบ">
       <button data-tab="data" class="active">ข้อมูล (CRUD)</button>
       <button data-tab="views">รายงาน (Views)</button>
       <button data-tab="dash">Dashboard</button>
@@ -17,7 +22,10 @@
     </nav>
     <button id="logout">ออกจากระบบ</button>
   </header>
-  <main><section id="panel"></section></main>
+  <main>
+    <div class="page-head"><h1 id="page-title"></h1><p id="page-desc"></p></div>
+    <section id="panel"></section>
+  </main>
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
