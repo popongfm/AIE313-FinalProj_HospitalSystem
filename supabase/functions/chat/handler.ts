@@ -16,7 +16,8 @@ export async function handleChat(deps: Deps, question: string, user: { id: strin
 
   let raw: string;
   try { raw = await deps.generateSql(q); }
-  catch { await log({ error: 'llm_unavailable' }); return fail('ระบบ AI ไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง'); }
+  catch (e) { const why = String((e as Error)?.message ?? e).slice(0, 300); console.error('[chat] LLM call failed:', why);
+    await log({ error: `llm_unavailable: ${why}` }); return fail('ระบบ AI ไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง'); }
 
   const guard = validateSql(raw);
   if (!guard.ok) { await log({ generated_sql: raw, error: 'rejected: ' + guard.reason }); return fail(guard.reason, raw); }
@@ -30,7 +31,7 @@ export async function handleChat(deps: Deps, question: string, user: { id: strin
   if (rows.length === 0) answer = 'ไม่พบข้อมูลที่ตรงกับคำถาม';
   else {
     try { answer = await deps.summarize(q, columns, rows.map((r) => columns.map((c) => r[c]))); }
-    catch { answer = `พบข้อมูล ${rows.length} แถว ดูรายละเอียดในตารางด้านล่าง`; }
+    catch (e) { console.error('[chat] LLM summary failed:', String((e as Error)?.message ?? e).slice(0, 300)); answer = `พบข้อมูล ${rows.length} แถว ดูรายละเอียดในตารางด้านล่าง`; }
   }
   await log({ generated_sql: guard.sql, tool_name: 'text-to-sql', row_count: rows.length });
   return { answer, sql: guard.sql, columns, rows, error: null };

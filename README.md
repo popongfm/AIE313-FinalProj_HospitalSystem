@@ -39,8 +39,10 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
 4. **Edge Functions** (ต้องมี Supabase CLI: `brew install supabase/tap/supabase` แล้ว `supabase login`) รันในโฟลเดอร์ repo
    chat หลักคือ **MCP (วิธี C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, วิธี B) เป็นตัวสำรอง:
    `supabase functions deploy chat-mcp --project-ref <ref>` (และ `chat` ถ้าต้องการ)
-   `supabase secrets set GROQ_API_KEY=<key> LLM_MODEL=llama-3.3-70b-versatile --project-ref <ref>`
-   (`<ref>` คือรหัสโปรเจกต์ใน URL ของ Dashboard; Supabase ใส่ `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY` ให้ function อัตโนมัติ) ตรวจชื่อโมเดลว่ายังใช้ได้ที่ https://console.groq.com/docs/models
+   `supabase secrets set GROQ_API_KEY=<key> LLM_MODEL=openai/gpt-oss-120b --project-ref <ref>`
+   (`<ref>` คือรหัสโปรเจกต์ใน URL ของ Dashboard; Supabase ใส่ `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY` ให้ function อัตโนมัติ) ตรวจชื่อโมเดลว่ายังใช้ได้ที่ https://console.groq.com/docs/models (Groq ปิด `llama-3.3-70b-versatile` ไปเมื่อ 16 ส.ค. 2026; ถ้าไม่ตั้ง `LLM_MODEL` function จะใช้ `openai/gpt-oss-120b`)
+   Supabase CLI รุ่นใหม่ใช้ `--remote=<ref>` แทน `--project-ref <ref>` และใส่ `--use-api --yes` ได้ถ้าไม่มี Docker หรือหน้าถามกดเลือกไม่ได้
+   **chat ขึ้น "ระบบ AI ไม่พร้อมใช้งาน":** สาเหตุจริงอยู่ใน Supabase → Edge Functions → `chat-mcp` → Logs (`LLM call failed: ...`) หรือ SQL editor: `SELECT created_at, error FROM chat_logs WHERE error LIKE 'llm_unavailable%' ORDER BY created_at DESC LIMIT 5;`
 5. จด **Project URL** และ **anon / publishable key** จาก Project Settings → API ไว้ใช้ใน Render (ห้ามใช้ `service_role` / `sb_secret_` key — server จะไม่ยอมเริ่มทำงาน)
 
 ### 2. Docker Hub (image ของเว็บ)

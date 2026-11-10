@@ -12,7 +12,7 @@
 | 5.6 SQL Script | `schema.sql`, `seed.sql` | แนบไฟล์ |
 | 6 SQL วิเคราะห์ | `analysis/analysis_queries.sql` (19 คำสั่ง), `docs/report/analysis.md` | เติม "การแปลความหมาย" ทุกข้อ และจับภาพผลลัพธ์ |
 | 7 Web App | `web/` | ถ่ายภาพหน้าจอ Registration/Login/CRUD/Views/Dashboard จากระบบที่ deploy แล้ว (รวมข้อความ "ยังไม่ได้รับสิทธิ์" ของบัญชีที่เพิ่งสมัคร) |
-| 8 Chat | `supabase/functions/chat-mcp/` (หลัก, MCP วิธี C), `supabase/functions/chat/` (สำรอง, Text-to-SQL วิธี B), `docs/test-cases.md` | ระบุ LLM+รุ่นที่ใช้, วาดแผนภาพสถาปัตยกรรม (Web → Edge Function → LLM → Supabase), ภาพหน้าจอ Chat |
+| 8 Chat | `supabase/functions/chat-mcp/` (หลัก, MCP วิธี C), `supabase/functions/chat/` (สำรอง, Text-to-SQL วิธี B), `docs/test-cases.md` | ระบุ LLM+รุ่นที่ใช้ (Groq `openai/gpt-oss-120b` ผ่าน secret `LLM_MODEL`), วาดแผนภาพสถาปัตยกรรม (Web → Edge Function → LLM → Supabase), ภาพหน้าจอ Chat |
 | 10 Testing | `docs/test-cases.md` | รันกรณี *todo* บนระบบจริง (รวมถามด้วย LLM จริง) |
 | 12 นำเสนอรายบุคคล | `docs/er/er_member_*.png` | คนละ ~5 นาที: ER, schema, normalization, views, SQL 1 ตัวอย่าง |
 | ส่งงาน | `schema.sql`, `seed.sql`, `analysis_queries.sql`, zip dataset, ลิงก์เว็บบน Render, ลิงก์ GitHub (และ Docker Hub), วิดีโอ ≤ 5 นาที | รายงาน PDF (TH Sarabun PSK 14pt), สไลด์ PDF รวมไฟล์เดียว, วิดีโอ |

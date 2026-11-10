@@ -36,6 +36,7 @@ test('LLM returns prose / empty text -> friendly error, no crash (Review Focus 2
 test('LLM request fails -> friendly error, still logged', async () => {
   const { d, calls } = deps({ generateSql: async () => { throw new Error('LLM request failed: 500'); } });
   const r = await handleChat(d, 'x', user); assert.ok(r.error); assert.ok(!String(r.error).includes('500')); assert.equal(calls.logs.length, 1);
+  assert.equal((calls.logs[0] as { error: string }).error, 'llm_unavailable: LLM request failed: 500', 'the reason is kept in chat_logs for troubleshooting');
 });
 test('database error -> friendly error without the raw message', async () => {
   const { d } = deps({ runQuery: async () => { throw new Error('relation "x" does not exist'); } });

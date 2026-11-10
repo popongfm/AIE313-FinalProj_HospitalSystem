@@ -6,6 +6,7 @@
 > - Chat หลักคือ MCP (วิธี C) `chat-mcp` ส่วน Text-to-SQL (วิธี B) `chat` เป็นตัวสำรอง
 > - หน้าเว็บมีปุ่มสมัครสมาชิก บัญชีใหม่จะเห็นข้อมูลเมื่อ admin ผูก profile แล้ว
 > - เว็บ deploy เป็น Docker image (Docker Hub) บน Render แทน Vercel และ CI อยู่ใน `.github/workflows/ci.yml`
+> - LLM ใช้ Groq `openai/gpt-oss-120b` เพราะ Groq ปิด `llama-3.3-70b-versatile` ไปเมื่อ 16 ส.ค. 2026
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

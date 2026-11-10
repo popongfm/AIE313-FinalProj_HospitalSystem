@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateSql, summarize, extractSql } from './llm.ts';
+import { generateSql, summarize, extractSql, DEFAULT_MODEL } from './llm.ts';
 
 type Call = { url: string; init: RequestInit };
 function fakeFetch(content: string, status = 200, calls: Call[] = []) {
@@ -29,6 +29,21 @@ test('generateSql calls the chat API with temperature 0, the schema prompt and t
 });
 test('generateSql throws on an HTTP error so the handler can answer gracefully', async () => {
   await assert.rejects(() => generateSql('q', 'S', fakeFetch('x', 500), opts), /LLM request failed: 500/);
+});
+test('the error names the provider\'s reason (e.g. a retired model) but never the key', async () => {
+  const groq404 = (async () => new Response(JSON.stringify({ error: { message: 'The model `llama-3.3-70b-versatile` has been decommissioned', type: 'invalid_request_error', code: 'model_decommissioned' } }), { status: 400 })) as unknown as typeof fetch;
+  const err = await generateSql('q', 'S', groq404, opts).then(() => new Error('no error'), (e: Error) => e);
+  assert.match(err.message, /^LLM request failed: 400 model_decommissioned: The model `llama-3.3-70b-versatile` has been decommissioned$/);
+  assert.ok(!err.message.includes('test-key'));
+  const plain = await generateSql('q', 'S', (async () => new Response('<html>bad gateway</html>', { status: 502 })) as unknown as typeof fetch, opts).then(() => new Error('no error'), (e: Error) => e);
+  assert.equal(plain.message, 'LLM request failed: 502');
+});
+test('default model is one Groq still serves (LLM_MODEL overrides it)', async () => {
+  assert.equal(DEFAULT_MODEL, 'openai/gpt-oss-120b');
+  const calls: Call[] = [];
+  await generateSql('q', 'S', fakeFetch('select 1', 200, calls), { apiKey: 'k' });
+  const sent = JSON.parse(calls[0].init.body as string).model;
+  assert.equal(sent, Deno.env.get('LLM_MODEL') ?? DEFAULT_MODEL);
 });
 test('summarize sends the question and data and returns the model text', async () => {
   const calls: Call[] = [];
