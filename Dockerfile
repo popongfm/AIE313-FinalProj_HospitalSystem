@@ -7,6 +7,10 @@ ENV NODE_ENV=production PORT=10000
 WORKDIR /app
 COPY scripts/write-config.mjs scripts/serve.mjs ./scripts/
 COPY web ./web
+# COPY keeps the files' permissions from the build machine. A checkout on macOS can be owner-only (-rw-------), and the
+# files belong to root here, so the node user could not read them (EACCES on start). Make the app world-readable,
+# read-only for everyone except root.
+RUN chmod -R a+rX,go-w /app
 USER node
 EXPOSE 10000
 HEALTHCHECK --interval=30s --timeout=3s CMD wget -qO- "http://127.0.0.1:${PORT}/healthz" || exit 1
