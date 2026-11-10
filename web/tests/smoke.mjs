@@ -96,6 +96,7 @@ await check('admin dashboard draws all 5 staff charts in order', async () => {
   await page.evaluate(() => { window.__charts = []; });
   await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 5);
   assert.deepEqual((await headings()).map((h) => h.slice(0, 2)), ['D1', 'D2', 'D3', 'D4', 'D5']);
+  assert.equal(await page.textContent('#page-desc'), 'กราฟตามหน้าที่ของบัญชีนี้ ผู้ดูแลระบบเห็นทุกกราฟ');
   const c = await page.evaluate(() => window.__charts.map((x) => ({ labels: x.data.labels, data: x.data.datasets.map((d) => d.data) })));
   assert.deepEqual(c[1].data[0], [150]);
   assert.deepEqual(c[3], { labels: ['อายุรกรรม', 'ไม่ระบุแผนก'], data: [[4, 0], [2, 2]] });
@@ -141,6 +142,17 @@ await check('patient account: own-record tables only, book with a doctor list, n
   await page.selectOption('#f_staff_id', '7'); await page.fill('#f_booking_date', '2099-01-02'); await page.fill('#f_booking_time', '10:30');
   await page.click('#form button[type=submit]'); await page.waitForSelector('#form', { state: 'hidden' });
   assert.deepEqual(await page.evaluate(() => window.__lastInsert), { staff_id: 7, booking_date: '2099-01-02', booking_time: '10:30', symptom: null }); });
+await check('patient: no reports tab, own-billing dashboard', async () => {
+  assert.equal(await page.isVisible('[data-tab=views]'), false);
+  assert.deepEqual(await page.$$eval('#nav button', (b) => b.filter((x) => !x.hidden).map((x) => x.dataset.tab)), ['data', 'dash', 'chat']);
+  await page.evaluate(() => { window.__charts = []; });
+  await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 1);
+  assert.equal(await page.textContent('#page-title'), 'ภาพรวมของฉัน');
+  assert.deepEqual(await headings(), ['ค่ารักษาของฉันรายเดือน (บาท)']);
+  assert.deepEqual(await page.evaluate(() => window.__charts[0].data.datasets[0].data), [150]); });
+await check('patient: app.html#views falls back to the data tab', async () => {
+  await page.goto('about:blank'); await page.goto(base + '/app.html#views'); await page.waitForSelector('#t');
+  assert.equal(await page.textContent('#page-title'), 'ข้อมูลของฉัน'); assert.equal(await page.locator('#v').count(), 0); });
 const loginAs = async (email) => {
   await page.goto(base + '/index.html'); await page.evaluate(() => localStorage.removeItem('mock_session')); await page.goto(base + '/index.html');
   await page.fill('#email', email); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html*'); await page.waitForSelector('#t'); };
