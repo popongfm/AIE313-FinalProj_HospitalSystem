@@ -17,9 +17,11 @@ function card(el, title) {
   c.innerHTML = `<h3></h3><div class="empty" hidden>ไม่พบข้อมูล</div><canvas></canvas>`; c.querySelector('h3').textContent = title;
   el.appendChild(c); return c;
 }
+function showEmpty(c) { c.querySelector('.empty').hidden = false; c.querySelector('canvas')?.remove(); }
+// a chart that cannot be drawn shows "ไม่พบข้อมูล" too; the error goes on to mountDashboard, which reports it
 function draw(c, config, hasData) {
-  if (!hasData) { c.querySelector('.empty').hidden = false; c.querySelector('canvas').remove(); return; }
-  new window.Chart(c.querySelector('canvas'), config);
+  if (!hasData) { showEmpty(c); return; }
+  try { new window.Chart(c.querySelector('canvas'), config); } catch (e) { showEmpty(c); throw e; }
 }
 const datasets = (p, type) => Object.entries(p.series).map(([name, data], i) => ({ label: name, data, backgroundColor: PALETTE[i % PALETTE.length], borderColor: PALETTE[i % PALETTE.length], type }));
 

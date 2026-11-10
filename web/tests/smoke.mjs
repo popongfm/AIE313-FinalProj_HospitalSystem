@@ -52,7 +52,7 @@ const browser = await chromium.launch();
 const ctx = await browser.newContext();
 await ctx.route('**/config.js', (r) => r.fulfill({ contentType: 'text/javascript', body: 'window.APP_CONFIG={SUPABASE_URL:"http://x",SUPABASE_ANON_KEY:"k"}' }));
 await ctx.route('**/cdn.jsdelivr.net/**', (r) => r.fulfill({ contentType: 'text/javascript', body: MOCK_SUPABASE }));
-await ctx.route('**/cdnjs.cloudflare.com/**', (r) => r.fulfill({ contentType: 'text/javascript', body: 'window.Chart=function(c,cfg){(window.__charts=window.__charts||[]).push(cfg)}' }));
+await ctx.route('**/cdnjs.cloudflare.com/**', (r) => r.fulfill({ contentType: 'text/javascript', body: 'window.Chart=function(c,cfg){if(window.__chartThrow)throw new Error("bad chart data");(window.__charts=window.__charts||[]).push(cfg)}' }));
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
 const results = [];
@@ -150,6 +150,13 @@ await check('patient: no reports tab, own-billing dashboard', async () => {
   assert.equal(await page.textContent('#page-title'), 'ภาพรวมของฉัน');
   assert.deepEqual(await headings(), ['ค่ารักษาของฉันรายเดือน (บาท)']);
   assert.deepEqual(await page.evaluate(() => window.__charts[0].data.datasets[0].data), [150]); });
+await check('reports button starts hidden in app.html, so patients never see it flash', async () => {
+  const html = await (await fetch(base + '/app.html')).text();
+  assert.match(html, /<button data-tab="views"[^>]*\shidden[\s>]/); });
+await check('patient: a scripted click on the hidden reports button changes nothing', async () => {
+  const before = await page.evaluate(() => location.hash);
+  await page.evaluate(() => document.querySelector('[data-tab=views]').click());
+  assert.equal(await page.evaluate(() => location.hash), before); assert.equal(await page.locator('#v').count(), 0); });
 await check('patient: app.html#views falls back to the data tab', async () => {
   await page.goto('about:blank'); await page.goto(base + '/app.html#views'); await page.waitForSelector('#t');
   assert.equal(await page.textContent('#page-title'), 'ข้อมูลของฉัน'); assert.equal(await page.locator('#v').count(), 0); });
@@ -168,6 +175,12 @@ await check('nurse dashboard: one failing chart does not block the other', async
   assert.ok((await page.textContent('#panel .err')).length > 0, 'error shown');
   assert.equal(await page.isVisible('#panel .card:first-child .empty'), true, 'D4 shows ไม่พบข้อมูล');
   await page.evaluate(() => { window.__failView = null; }); });
+await check('a chart that throws while drawing shows ไม่พบข้อมูล and the error line', async () => {
+  await loginAs('ph@b.th'); await page.evaluate(() => { window.__chartThrow = true; });
+  await page.click('[data-tab=dash]'); await page.waitForFunction(() => document.querySelectorAll('#panel h3').length === 2 && document.querySelector('#panel .err').textContent.length > 0);
+  assert.deepEqual(await page.$$eval('#panel .card .empty', (e) => e.map((x) => !x.hidden)), [true, true]);
+  assert.equal(await page.locator('#panel canvas').count(), 0);
+  await page.evaluate(() => { window.__chartThrow = false; }); });
 await check('no uncaught page errors', async () => { assert.deepEqual(errors, [], JSON.stringify(errors)); });
 console.log(results.join('\n'));
 await browser.close(); server.close();

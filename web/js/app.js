@@ -49,7 +49,7 @@ async function show(tab) {
 }
 document.getElementById('nav').addEventListener('click', (e) => {
   const tab = e.target.dataset.tab;
-  if (!tab) return;
+  if (!tab || !tabs.includes(tab)) return;   // a hidden tab: leave the URL and the page as they are
   history.replaceState(null, '', '#' + tab);   // a reload keeps the current tab
   show(tab);
 });
