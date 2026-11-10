@@ -5,6 +5,7 @@
 > - `run_readonly_query` คืนค่า `json` (ใช้ `json_agg`) ไม่ใช่ `jsonb` เพื่อให้ลำดับคอลัมน์ตรงกับ SELECT และเป็นของ role `chat_reader` (`db/07_chat_support.sql`)
 > - Chat หลักคือ MCP (วิธี C) `chat-mcp` ส่วน Text-to-SQL (วิธี B) `chat` เป็นตัวสำรอง
 > - หน้าเว็บมีปุ่มสมัครสมาชิก บัญชีใหม่จะเห็นข้อมูลเมื่อ admin ผูก profile แล้ว
+> - เว็บ deploy เป็น Docker image (Docker Hub) บน Render แทน Vercel และ CI อยู่ใน `.github/workflows/ci.yml`
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

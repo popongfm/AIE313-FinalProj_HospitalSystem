@@ -32,7 +32,7 @@ Render รันบนเครื่อง x86 ดังนั้น image ต�
   docker login
   docker buildx build --platform linux/amd64 -t <dockerhub-user>/aie313-hospital-web:latest --push .
   ```
-- **ให้ GitHub Actions build ให้** (`.github/workflows/docker-publish.yml`): ใน GitHub repo → Settings → Secrets and variables → Actions เพิ่ม `DOCKERHUB_USERNAME` และ `DOCKERHUB_TOKEN` (Docker Hub → Account settings → Personal access tokens, สิทธิ์ Read & Write) แล้วกด Actions → docker-publish → Run workflow หลังจากนั้นจะ build ใหม่เองทุกครั้งที่ push การแก้ใน `web/` ถ้าใส่ `RENDER_DEPLOY_HOOK_URL` ด้วย Render จะ deploy ใหม่ให้อัตโนมัติ
+- **ให้ CI build ให้** (job `Web image` ใน `.github/workflows/ci.yml`): ใน GitHub repo → Settings → Secrets and variables → Actions เพิ่ม secret `DOCKERHUB_USERNAME` และ `DOCKERHUB_TOKEN` (Docker Hub → Account settings → Personal access tokens, สิทธิ์ Read & Write) หลังจากนั้นทุกครั้งที่ push เข้า `main` และ test ผ่านครบ CI จะ push image ขึ้น Docker Hub ให้ ถ้าใส่ secret `RENDER_DEPLOY_HOOK_URL` ด้วย Render จะ deploy image ใหม่ให้อัตโนมัติ
 
 ลองรันในเครื่องก่อนได้: `docker run --rm -p 8080:10000 -e SUPABASE_URL=<url> -e SUPABASE_ANON_KEY=<anon key> <dockerhub-user>/aie313-hospital-web:latest` แล้วเปิด http://localhost:8080
 
@@ -42,7 +42,7 @@ Render รันบนเครื่อง x86 ดังนั้น image ต�
 3. Environment Variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (และ `CHAT_FUNCTION=chat` ถ้าจะใช้ Text-to-SQL แทน MCP)
 4. Advanced → **Health Check Path**: `/healthz` → **Deploy**
 5. กลับไปใส่ URL ของ Render ใน Supabase (ขั้น 1.3)
-- push image ใหม่แล้ว Render **ไม่ deploy เอง**: กด Manual Deploy → **Deploy latest reference** หรือใช้ Deploy Hook (Settings → Deploy Hook) กับ GitHub Actions ด้านบน
+- push image ใหม่แล้ว Render **ไม่ deploy เอง**: กด Manual Deploy → **Deploy latest reference** หรือเอา Deploy Hook (Settings → Deploy Hook) ไปใส่เป็น secret `RENDER_DEPLOY_HOOK_URL` ให้ CI สั่ง deploy
 - Plan Free จะหลับเมื่อไม่มีคนใช้ 15 นาที เปิดครั้งแรกรอประมาณ 1 นาที ควรเปิดเว็บทิ้งไว้ก่อนอัดวิดีโอหรือนำเสนอ
 
 ### 4. ทดสอบบนระบบจริง
@@ -72,8 +72,9 @@ Render รันบนเครื่อง x86 ดังนั้น image ต�
 | Web tests | unit test และ smoke test บน Chromium |
 | Supabase e2e | เปิด Supabase ตัวจริงด้วย Supabase CLI, ลง `schema.sql` ด้วย role `postgres` แบบ SQL editor แล้วทดสอบ 130 เคสผ่าน API: สิทธิ์ของทุก role, SQL/argument อันตรายจาก LLM (ใช้ LLM จำลอง ไม่ต้องมี Groq key), CRUD และข้อความ error |
 | Deploy Edge Functions | หลังทุก job ผ่านบน `main` จะ deploy `chat-mcp` และ `chat` ให้อัตโนมัติ |
+| Web image (Docker Hub → Render) | ทุก PR: build image `linux/amd64` แล้วเปิด container ลองจริง (`/healthz`, หน้าเว็บ, `config.js` มาจาก env, ไม่มี key ใน image, ไม่ยอมเริ่มเมื่อได้ service_role key) · หลังทุก job ผ่านบน `main`: push ขึ้น Docker Hub และสั่ง Render deploy |
 
-เปิดใช้ deploy อัตโนมัติ (เจ้าของ repo ทำครั้งเดียว): Settings → Secrets and variables → Actions → เพิ่ม **secret** `SUPABASE_ACCESS_TOKEN` (สร้างที่ supabase.com/dashboard/account/tokens) และ **variable** `SUPABASE_PROJECT_REF` ถ้ายังไม่ตั้ง job deploy จะข้ามไปเฉยๆ โดย CI ยังผ่าน ส่วนเว็บ deploy ผ่าน Vercel อยู่แล้ว และ database ยังต้องรัน SQL ที่เปลี่ยนเองใน SQL editor เพราะ `schema.sql` รันซ้ำบนฐานข้อมูลเดิมไม่ได้
+เปิดใช้ deploy อัตโนมัติ (เจ้าของ repo ทำครั้งเดียว): Settings → Secrets and variables → Actions → เพิ่ม **secret** `SUPABASE_ACCESS_TOKEN` (สร้างที่ supabase.com/dashboard/account/tokens) และ **variable** `SUPABASE_PROJECT_REF` สำหรับเว็บเพิ่ม **secret** `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN` และ `RENDER_DEPLOY_HOOK_URL` (Render → service → Settings → Deploy Hook) ถ้ายังไม่ตั้ง job deploy จะข้ามไปเฉยๆ โดย CI ยังผ่าน ส่วน database ยังต้องรัน SQL ที่เปลี่ยนเองใน SQL editor เพราะ `schema.sql` รันซ้ำบนฐานข้อมูลเดิมไม่ได้
 
 ## ตัวแปร environment
 | ที่ใช้ | ชื่อ | หมายเหตุ |

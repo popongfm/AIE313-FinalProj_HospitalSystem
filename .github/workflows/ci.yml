@@ -1,7 +1,10 @@
-# CI: every pull request and every push to main runs all test suites.
-# CD: after everything passes on main, the two chat Edge Functions are deployed to Supabase
-#     (only when the SUPABASE_ACCESS_TOKEN secret and SUPABASE_PROJECT_REF variable are set).
-# The web app is deployed by Vercel's Git integration; the database schema is applied by hand (see README).
+# CI: every pull request and every push to main runs all test suites, and builds and starts the web Docker image.
+# CD: after everything passes on main,
+#     - the two chat Edge Functions are deployed to Supabase (when secret SUPABASE_ACCESS_TOKEN and variable
+#       SUPABASE_PROJECT_REF are set);
+#     - the web image is pushed to Docker Hub (when secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN are set) and
+#       Render is told to redeploy it (when secret RENDER_DEPLOY_HOOK_URL is set).
+# The database schema is applied by hand (see README).
 name: CI
 
 on:
@@ -196,3 +199,67 @@ jobs:
         run: |
           supabase functions deploy chat-mcp --project-ref "$SUPABASE_PROJECT_REF"
           supabase functions deploy chat --project-ref "$SUPABASE_PROJECT_REF"
+
+  web-image:
+    name: Web image (Docker Hub → Render)
+    needs: [static, db, functions, web, supabase-e2e]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      IMAGE: aie313-hospital-web
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+      PUBLISH: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the image (linux/amd64, the platform Render runs)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: ${{ env.IMAGE }}:ci
+      - name: Container starts, serves the app, and holds no keys
+        run: |
+          docker run -d --name web -p 8080:10000 -e SUPABASE_URL=https://example.supabase.co -e SUPABASE_ANON_KEY=sb_publishable_ci "$IMAGE:ci"
+          for i in $(seq 1 20); do curl -fsS localhost:8080/healthz >/dev/null && break; [ "$i" = 20 ] && { docker logs web; exit 1; }; sleep 1; done
+          curl -fsS localhost:8080/ | grep -q 'สมัครสมาชิก'
+          curl -fsS localhost:8080/config.js | grep -q 'example.supabase.co'
+          [ "$(curl -s -o /dev/null -w '%{http_code}' localhost:8080/tests/smoke.mjs)" = 404 ]
+          if docker run --rm --entrypoint sh "$IMAGE:ci" -c 'test -e /app/web/config.js'; then
+            echo "::error::config.js is baked into the image"; exit 1
+          fi
+          # a fake service_role JWT, built here so no key-like string is committed
+          FAKE_SERVICE_KEY="h.$(printf '{"role":"service_role"}' | base64 | tr -d '=' | tr '/+' '_-').s"
+          if docker run --rm -e SUPABASE_URL=https://x.supabase.co -e SUPABASE_ANON_KEY="$FAKE_SERVICE_KEY" "$IMAGE:ci"; then
+            echo "::error::the container started with a service_role key"; exit 1
+          fi
+          docker rm -f web
+      - name: Skip publishing (pull request, or Docker Hub secrets not set)
+        if: env.PUBLISH != 'true' || env.DOCKERHUB_USERNAME == '' || env.DOCKERHUB_TOKEN == ''
+        run: echo "::notice::Image built and tested, not pushed. On main, add secrets DOCKERHUB_USERNAME and DOCKERHUB_TOKEN to publish it."
+      - uses: docker/login-action@v3
+        if: env.PUBLISH == 'true' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Push to Docker Hub
+        if: env.PUBLISH == 'true' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/aie313-hospital-web:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/aie313-hospital-web:${{ github.sha }}
+      - name: Tell Render to deploy the new image
+        if: env.PUBLISH == 'true' && env.DOCKERHUB_USERNAME != '' && env.DOCKERHUB_TOKEN != ''
+        run: |
+          if [ -n "$RENDER_DEPLOY_HOOK_URL" ]; then
+            curl -fsS -X POST "$RENDER_DEPLOY_HOOK_URL" >/dev/null && echo "Render deploy triggered"
+          else
+            echo "::notice::RENDER_DEPLOY_HOOK_URL not set; in Render use Manual Deploy → Deploy latest reference."
+          fi
