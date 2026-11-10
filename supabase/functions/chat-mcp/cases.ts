@@ -16,7 +16,7 @@ const CASES: Case[] = [
 ];
 async function psql(sql: string): Promise<Record<string, unknown>[]> {
   const p = new Deno.Command('psql', { args: ['-X', '-At', '-d', db], stdin: 'piped', stdout: 'piped', stderr: 'piped' }).spawn();
-  const w = p.stdin.getWriter(); await w.write(new TextEncoder().encode(`SET ROLE service_role;\nSELECT run_readonly_query($q$${sql}$q$)::text;\n`)); await w.close();
+  const w = p.stdin.getWriter(); await w.write(new TextEncoder().encode(`SET ROLE service_role;\nSELECT replace(run_readonly_query($q$${sql}$q$)::text, E'\\n', '');\n`)); await w.close(); // json_agg spans lines; keep it on one
   const r = await p.output();
   if (!r.success) throw new Error(new TextDecoder().decode(r.stderr));
   return JSON.parse(new TextDecoder().decode(r.stdout).split('\n').filter((l) => l.startsWith('['))[0]);

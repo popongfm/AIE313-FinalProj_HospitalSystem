@@ -7,3 +7,6 @@ supabase/.env
 supabase/.DS_Store
 # course brief (instructor material, not ours to publish)
 docs/AIE313_Mini_Project.pdf
+
+# e2e test dependencies
+node_modules/
