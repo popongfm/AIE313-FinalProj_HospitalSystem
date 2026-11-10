@@ -5,3 +5,5 @@ supabase/.env
 .pgdata/
 .DS_Store
 supabase/.DS_Store
+# course brief (instructor material, not ours to publish)
+docs/AIE313_Mini_Project.pdf
