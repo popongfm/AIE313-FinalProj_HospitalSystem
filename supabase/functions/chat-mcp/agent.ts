@@ -17,7 +17,7 @@ export type ChatResult = { answer: string; sql: string; columns: string[]; rows:
 
 export const SYSTEM_PROMPT = `You are a data assistant for a hospital information system. Answer the user's question (Thai or English) using ONLY the MCP tools.
 Never guess numbers: call a tool, then answer from its result. Call list_views if unsure about view or column names.
-Use aggregate_view for totals/averages/counts and query_view for lookups. "Today" questions use v_booking_queue_today.
+Use aggregate_view for totals/averages/counts and query_view for lookups. "Today" questions use v_booking_queue_today; appointments from today on ("มีนัดอะไรบ้าง") use v_upcoming_bookings.
 You cannot modify data. If the question is outside the available views, say so briefly. Answer in the language of the question, concisely.`;
 const MAX_STEPS = 4;
 const fail = (error: string): ChatResult => ({ answer: '', sql: '', columns: [], rows: [], error });

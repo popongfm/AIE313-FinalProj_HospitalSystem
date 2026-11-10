@@ -1,7 +1,7 @@
-// Defence in depth for Text-to-SQL: the database role (chat_reader) can only read 9 views anyway; this guard rejects
+// Defence in depth for Text-to-SQL: the database role (chat_reader) can only read 10 views anyway; this guard rejects
 // everything else before it reaches the database and enforces a row limit.
 export const ALLOWED_VIEWS = [
-  'v_booking_queue_today', 'v_doctor_workload', 'v_feedback_summary', 'v_bed_occupancy', 'v_visit_billing',
+  'v_booking_queue_today', 'v_upcoming_bookings', 'v_doctor_workload', 'v_feedback_summary', 'v_bed_occupancy', 'v_visit_billing',
   'v_top_diagnosis', 'v_pharmacist_screening_queue', 'v_inventory_stock_status', 'v_drug_cost_summary',
 ] as const;
 export type GuardResult = { ok: true; sql: string } | { ok: false; reason: string };

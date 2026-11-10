@@ -5,6 +5,7 @@ import subprocess, sys
 db = sys.argv[1]
 VIEWS = {
  'v_booking_queue_today': 'การจองคิวของวันนี้ (booking_time, queue_no, doctor_name, department, status)',
+ 'v_upcoming_bookings': 'คิวนัดตั้งแต่วันนี้เป็นต้นไป ทุกสถานะ (booking_date, booking_time, doctor_name, department, status) ใช้ตอบคำถามว่ามีนัดหมายอะไรบ้าง',
  'v_doctor_workload': 'จำนวนการจองต่อแพทย์ต่อสถานะ (status: pending/confirmed/completed/cancelled)',
  'v_feedback_summary': 'จำนวนข้อเสนอแนะต่อแพทย์',
  'v_bed_occupancy': 'อัตราการใช้เตียงต่อห้อง (occupancy_pct เป็นเปอร์เซ็นต์)',

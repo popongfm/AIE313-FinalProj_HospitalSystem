@@ -81,13 +81,13 @@ U.admin = await makeUser('admin', { role: 'admin' });
 
 const TABLES = ['department', 'staff', 'patient', 'room', 'bed', 'visit', 'admission', 'diagnosis', 'lab_result', 'insurance_coverage', 'daily_charge',
   'booking', 'feedback', 'drug', 'drug_lot', 'prescription', 'prescription_item', 'dispense_record', 'inventory', 'drug_allergy_record'];
-const VIEWS = ['v_booking_queue_today', 'v_doctor_workload', 'v_feedback_summary', 'v_bed_occupancy', 'v_visit_billing', 'v_top_diagnosis',
+const VIEWS = ['v_booking_queue_today', 'v_upcoming_bookings', 'v_doctor_workload', 'v_feedback_summary', 'v_bed_occupancy', 'v_visit_billing', 'v_top_diagnosis',
   'v_pharmacist_screening_queue', 'v_inventory_stock_status', 'v_drug_cost_summary'];
 // what a patient account must see: its own rows of 4 tables, its own rows of the 3 per-patient views, all of the summary views
 const OWN = (rel) => ({
   patient: 1, booking: `select count(*) from booking where patient_id = ${PID}`, visit: `select count(*) from visit where patient_id = ${PID}`,
   prescription: `select count(*) from prescription pr join visit v using (visit_id) where v.patient_id = ${PID}`,
-  v_booking_queue_today: `select count(*) from v_booking_queue_today where hn = '${PHN}'`, v_visit_billing: `select count(*) from v_visit_billing where hn = '${PHN}'`,
+  v_booking_queue_today: `select count(*) from v_booking_queue_today where hn = '${PHN}'`, v_upcoming_bookings: `select count(*) from v_upcoming_bookings where hn = '${PHN}'`, v_visit_billing: `select count(*) from v_visit_billing where hn = '${PHN}'`,
   v_pharmacist_screening_queue: `select count(*) from v_pharmacist_screening_queue where hn = '${PHN}'`,
 })[rel];
 const patientExpect = (rel) => { const q = OWN(rel); return typeof q === 'number' ? q : q ? Number(sql(q)) : rel.startsWith('v_') ? Number(sql(`select count(*) from ${rel}`)) : 0; };
@@ -97,7 +97,7 @@ const count = async (sb, rel) => { const r = await sb.from(rel).select('*', { co
 let C = 'A สิทธิ์การเข้าถึง';
 for (const [who, u] of Object.entries(U)) {
   const staff = ['nurse', 'doctor', 'pharmacist', 'admin'].includes(who);
-  for (const [label, rels] of [['20 ตาราง', TABLES], ['9 views', VIEWS]]) {
+  for (const [label, rels] of [['20 ตาราง', TABLES], ['10 views', VIEWS]]) {
     const got = []; for (const r of rels) got.push([r, await count(u.sb, r)]);
     const bad = got.filter(([r, n]) => who === 'anon' ? !String(n).startsWith('ERR') : staff ? !(typeof n === 'number' && n > 0)
       : who === 'patient' ? n !== patientExpect(r) : n !== 0);

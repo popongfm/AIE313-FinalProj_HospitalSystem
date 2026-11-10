@@ -50,7 +50,7 @@ test('does not reject legitimate column names that contain keywords', () => {
 test('schema prompt lists every allowed view and never mentions PII columns (Review Focus 4)', () => {
   for (const v of ALLOWED_VIEWS) assert.ok(SCHEMA_PROMPT.includes(v), v);
   for (const pii of ['national_id', 'phone', 'email', 'address', 'birth_date']) assert.ok(!SCHEMA_PROMPT.includes(pii), pii);
-  assert.equal(ALLOWED_VIEWS.length, 9);
+  assert.equal(ALLOWED_VIEWS.length, 10);
 });
 
 test('rejects string-executing / non-allowlisted functions and split keywords (review C1/I1)', () => {

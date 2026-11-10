@@ -42,6 +42,51 @@ export const VIEW_CATALOG: ViewCatalog = {
    }
   ]
  },
+ "v_upcoming_bookings": {
+  "description": "คิวนัดตั้งแต่วันนี้เป็นต้นไป ทุกสถานะ (booking_date, booking_time, doctor_name, department, status) ใช้ตอบคำถามว่ามีนัดหมายอะไรบ้าง",
+  "columns": [
+   {
+    "name": "booking_id",
+    "type": "int4"
+   },
+   {
+    "name": "booking_date",
+    "type": "date"
+   },
+   {
+    "name": "booking_time",
+    "type": "time"
+   },
+   {
+    "name": "queue_no",
+    "type": "int2"
+   },
+   {
+    "name": "hn",
+    "type": "varchar"
+   },
+   {
+    "name": "patient_first_name",
+    "type": "varchar"
+   },
+   {
+    "name": "doctor_name",
+    "type": "text"
+   },
+   {
+    "name": "department",
+    "type": "varchar"
+   },
+   {
+    "name": "symptom",
+    "type": "text"
+   },
+   {
+    "name": "status",
+    "type": "varchar"
+   }
+  ]
+ },
  "v_doctor_workload": {
   "description": "จำนวนการจองต่อแพทย์ต่อสถานะ (status: pending/confirmed/completed/cancelled)",
   "columns": [

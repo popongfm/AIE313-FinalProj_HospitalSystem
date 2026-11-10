@@ -15,13 +15,13 @@ ALTER TABLE chat_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_chat_logs_select ON chat_logs FOR SELECT TO authenticated USING (user_id = auth.uid());
 CREATE POLICY own_chat_logs_insert ON chat_logs FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
 
--- Read-only role used only inside run_readonly_query(): the 9 views, no base tables.
+-- Read-only role used only inside run_readonly_query(): the 10 views, no base tables.
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'chat_reader') THEN CREATE ROLE chat_reader NOLOGIN; END IF;
 END $$;
 GRANT USAGE ON SCHEMA public TO chat_reader;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM chat_reader;
-GRANT SELECT ON v_booking_queue_today, v_doctor_workload, v_feedback_summary, v_bed_occupancy, v_visit_billing,
+GRANT SELECT ON v_booking_queue_today, v_upcoming_bookings, v_doctor_workload, v_feedback_summary, v_bed_occupancy, v_visit_billing,
                 v_top_diagnosis, v_pharmacist_screening_queue, v_inventory_stock_status, v_drug_cost_summary TO chat_reader;
 -- the views' access check calls these; Postgres checks EXECUTE for the caller (chat_reader inside the RPC)
 GRANT EXECUTE ON FUNCTION is_app_user(), my_patient_id(), no_signed_in_user() TO chat_reader;
@@ -29,7 +29,7 @@ GRANT EXECUTE ON FUNCTION is_app_user(), my_patient_id(), no_signed_in_user() TO
 -- NOTE: statement_timeout cannot be (re)armed from inside a function, so long-running queries are prevented by
 -- sqlGuard (no functions such as pg_sleep, forced LIMIT 100) and, optionally, a role-level timeout set once by an admin:
 --   ALTER ROLE service_role SET statement_timeout = '10s';   -- PostgREST applies per-role settings per request
--- SECURITY DEFINER and OWNED BY chat_reader: the query runs with chat_reader's privileges (9 views only) and, because
+-- SECURITY DEFINER and OWNED BY chat_reader: the query runs with chat_reader's privileges (10 views only) and, because
 -- Postgres forbids changing "role" inside a security-definer function, it cannot switch itself to service_role.
 -- RETURNS json (not jsonb): jsonb re-sorts object keys by length, so the chat table's columns came back in a different
 -- order from the SELECT; json keeps them as written.

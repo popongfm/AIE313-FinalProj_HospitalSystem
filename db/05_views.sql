@@ -1,4 +1,4 @@
--- 9 chat-visible views (owner-rights so chat_reader needs no table access); none expose national_id/phone/email/address/birth_date.
+-- 10 chat-visible views (owner-rights so chat_reader needs no table access); none expose national_id/phone/email/address/birth_date.
 -- Owner-rights views bypass the tables' RLS, so each view repeats the access rule itself in its WHERE:
 --   (current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user())  -- SQL editor, service_role, chat RPC without a user
 --   OR is_app_user()                                                         -- linked staff / admin: every row
@@ -16,6 +16,17 @@ JOIN staff s ON s.staff_id = b.staff_id
 LEFT JOIN department d ON d.department_id = s.department_id
 WHERE b.booking_date = CURRENT_DATE AND ((current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user()) OR is_app_user() OR p.patient_id = my_patient_id())
 ORDER BY s.staff_id, b.queue_no;
+
+-- Upcoming appointments from today on, every status ("what appointments do I have?"); one row per patient booking.
+CREATE VIEW v_upcoming_bookings AS
+SELECT b.booking_id, b.booking_date, b.booking_time, b.queue_no, p.hn, p.first_name AS patient_first_name,
+       s.first_name || ' ' || s.last_name AS doctor_name, d.name AS department, b.symptom, b.status
+FROM booking b
+JOIN patient p ON p.patient_id = b.patient_id
+JOIN staff s ON s.staff_id = b.staff_id
+LEFT JOIN department d ON d.department_id = s.department_id
+WHERE b.booking_date >= CURRENT_DATE AND ((current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user()) OR is_app_user() OR p.patient_id = my_patient_id())
+ORDER BY b.booking_date, b.booking_time, s.staff_id;
 
 CREATE VIEW v_doctor_workload AS
 SELECT s.staff_id, s.first_name || ' ' || s.last_name AS doctor_name, d.name AS department,

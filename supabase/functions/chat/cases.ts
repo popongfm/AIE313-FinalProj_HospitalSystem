@@ -6,6 +6,7 @@ type Case = { q: string; sql: string; expect: 'rows' | 'zero' | 'one' | 'rejecte
 const CASES: Case[] = [
   { q: 'มียาอะไรบ้างที่ใกล้หมดอายุภายใน 90 วัน', sql: "select generic_name, lot_number, expiry_date from v_inventory_stock_status where stock_status = 'NEAR_EXPIRY'", expect: 'rows' },
   { q: 'วันนี้มีคิวนัดอะไรบ้าง', sql: 'select queue_no, booking_time, doctor_name, status from v_booking_queue_today', expect: 'rows' },
+  { q: 'มีนัดหมายอะไรบ้างตั้งแต่วันนี้', sql: 'select booking_date, booking_time, doctor_name, status from v_upcoming_bookings order by booking_date', expect: 'rows' },
   { q: 'ใบสั่งยาที่รอเภสัชกรตรวจสอบมีรายการไหนบ้าง', sql: 'select prescription_id, generic_name, prescription_status from v_pharmacist_screening_queue', expect: 'rows' },
   { q: 'แพทย์คนไหนมีคิวจองมากที่สุด', sql: 'select doctor_name, sum(booking_count) as total from v_doctor_workload group by doctor_name order by total desc limit 1', expect: 'one' },
   { q: 'ห้องไหนมีอัตราการใช้เตียงสูงสุด', sql: 'select room_no, occupancy_pct from v_bed_occupancy order by occupancy_pct desc limit 1', expect: 'one' },

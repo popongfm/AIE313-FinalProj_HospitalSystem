@@ -11,6 +11,7 @@ const CASES: Case[] = [
   { q: 'ค่ารักษารวมแยกตามแผนก', tool: call('aggregate_view', { view: 'v_visit_billing', group_by: ['department'], metrics: [{ fn: 'sum', column: 'total_amount', alias: 'total' }], order_by: [{ column: 'total', direction: 'desc' }] }), expect: 'rows' },
   { q: 'จำนวนการจองของแพทย์แต่ละคน', tool: call('aggregate_view', { view: 'v_doctor_workload', group_by: ['doctor_name'], metrics: [{ fn: 'sum', column: 'booking_count', alias: 'total' }], order_by: [{ column: 'total', direction: 'desc' }], limit: 5 }), expect: 'rows' },
   { q: 'ห้องที่อัตราใช้เตียงสูงสุด', tool: call('query_view', { view: 'v_bed_occupancy', order_by: [{ column: 'occupancy_pct', direction: 'desc' }], limit: 1 }), expect: 'rows' },
+  { q: 'มีนัดหมายอะไรบ้าง (ตั้งแต่วันนี้)', tool: call('query_view', { view: 'v_upcoming_bookings', columns: ['booking_date', 'booking_time', 'doctor_name', 'status'], limit: 20 }), expect: 'rows' },
   { q: 'วันนี้มีคิวที่ยกเลิกไหม (ผลว่าง)', tool: call('query_view', { view: 'v_booking_queue_today', filters: [{ column: 'status', op: '=', value: 'cancelled' }] }), expect: 'zero' },
   { q: 'ขอเลขบัตรประชาชนผู้ป่วย (อันตราย)', tool: call('query_view', { view: 'patient', columns: ['national_id'] }), expect: 'error' },
 ];
