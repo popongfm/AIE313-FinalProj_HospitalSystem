@@ -14,3 +14,16 @@ export const TABLES = {
   drug: { label: 'ยา', pk: 'drug_id', cols: [t('generic_name', 'ชื่อสามัญ', true), t('trade_name', 'ชื่อการค้า', true), t('dosage_form', 'รูปแบบ', true), t('strength', 'ความแรง', true), t('unit', 'หน่วย', true)] },
   inventory: { label: 'สต็อกยา', pk: 'inventory_id', cols: [n('drug_id', 'รหัสยา', true), n('lot_id', 'รหัส lot', true), t('location', 'ตำแหน่งเก็บ', true), n('quantity_on_hand', 'จำนวนคงเหลือ', true), n('reorder_point', 'จุดสั่งซื้อ')] },
 };
+
+// Patient accounts (profiles.role = 'patient'): only their own rows come back from the database (RLS in 06_rls.sql).
+// insert/edit/remove say which buttons to show; the database allows exactly these and nothing more.
+export const PATIENT_TABLES = {
+  patient: { label: 'ข้อมูลของฉัน', pk: 'patient_id', insert: false, remove: false,   // edit = contact details only
+    cols: [t('phone', 'โทรศัพท์ (10 หลัก)'), t('email', 'อีเมล'), t('address', 'ที่อยู่')] },
+  booking: { label: 'คิวนัดของฉัน', pk: 'booking_id', edit: false, remove: false, cancel: true, addLabel: '+ จองคิว',   // book and cancel; queue number is assigned
+    cols: [{ name: 'staff_id', label: 'แพทย์', type: 'select', source: 'doctors', numeric: true, required: true },
+      { name: 'booking_date', label: 'วันที่นัด', type: 'date', required: true, minToday: true },
+      { name: 'booking_time', label: 'เวลา', type: 'time', required: true }, t('symptom', 'อาการ')] },
+  visit: { label: 'การเข้ารับบริการของฉัน', pk: 'visit_id', readOnly: true, cols: [] },
+  prescription: { label: 'ใบสั่งยาของฉัน', pk: 'prescription_id', readOnly: true, cols: [] },
+};

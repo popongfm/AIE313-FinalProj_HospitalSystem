@@ -16,7 +16,8 @@ CREATE TABLE booking (
 CREATE INDEX idx_bookings_patient ON booking (patient_id);
 CREATE INDEX idx_date_status ON booking (booking_date, status);
 
-CREATE FUNCTION trg_booking_staff_is_doctor() RETURNS trigger LANGUAGE plpgsql AS $$
+-- security definer: a patient booking a queue cannot read staff (RLS), but the check must still see the doctor
+CREATE FUNCTION trg_booking_staff_is_doctor() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF (SELECT role FROM staff WHERE staff_id = NEW.staff_id) IS DISTINCT FROM 'doctor' THEN
     RAISE EXCEPTION 'booking.staff_id must reference a doctor' USING ERRCODE = 'check_violation';

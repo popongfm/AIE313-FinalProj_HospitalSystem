@@ -1,6 +1,6 @@
-import { requireSession, signOut, hasAccess } from './auth.js';
+import { requireSession, signOut, getAccess } from './auth.js';
 const mounts = {
-  data:  async (el) => (await import('./crud.js')).mountCrudPage(el),
+  data:  async (el, access) => (await import('./crud.js')).mountCrudPage(el, access),
   views: async (el) => (await import('./views.js')).mountViewsPage(el),
   dash:  async (el) => (await import('./dashboard.js')).mountDashboard(el),
   chat:  async (el) => (await import('./chat.js')).mountChat(el),
@@ -11,6 +11,12 @@ const HEADINGS = {
   dash:  ['Dashboard', 'ภาพรวมการจองคิวของแพทย์ ค่ารักษารายเดือน และยาที่ต่ำกว่าจุดสั่งซื้อ'],
   chat:  ['ผู้ช่วย AI', 'ถามเป็นภาษาไทยหรืออังกฤษ ทุกคำตอบแสดง SQL และตารางข้อมูลที่ใช้'],
 };
+// patient accounts see only their own records (RLS); the headings say so
+const PATIENT_HEADINGS = {
+  data:  ['ข้อมูลของฉัน', 'ดูประวัติการรักษาและใบสั่งยาของคุณ จองหรือยกเลิกคิว และแก้เบอร์โทร อีเมล ที่อยู่'],
+  views: ['รายงาน', 'รายงานที่มีข้อมูลรายคน (คิววันนี้ ค่ารักษา ใบสั่งยา) แสดงเฉพาะของคุณ รายงานภาพรวมแสดงทั้งโรงพยาบาล'],
+  chat:  ['ผู้ช่วย AI', 'ถามเกี่ยวกับคิว ค่ารักษา หรือใบสั่งยาของคุณ คำตอบมาจากข้อมูลของคุณเท่านั้น'],
+};
 // app.html#chat etc. opens that tab; the landing page's shortcuts link here, and the tab survives the sign-in detour.
 const NEXT_KEY = 'aie313.nextTab';
 // own keys only: mounts['constructor'] / ['toString'] come from Object.prototype and would break show()
@@ -19,7 +25,8 @@ const store = (fn) => { try { fn(sessionStorage); } catch { /* storage blocked: 
 
 async function init(session) {
 const panel = document.getElementById('panel');
-if (!(await hasAccess(session))) {
+const access = await getAccess(session);
+if (!access.linked) {
   const note = document.createElement('div');
   note.id = 'pending'; note.className = 'card err'; note.setAttribute('role', 'alert');
   note.textContent = 'บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน จึงยังไม่เห็นข้อมูล กรุณาติดต่อผู้ดูแลระบบเพื่ออนุมัติ';
@@ -27,13 +34,13 @@ if (!(await hasAccess(session))) {
 }
 async function show(tab) {
   document.querySelectorAll('#nav button').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
-  const [title, desc] = HEADINGS[tab];
+  const [title, desc] = (access.patient && PATIENT_HEADINGS[tab]) || HEADINGS[tab];
   document.getElementById('page-title').textContent = title;
   document.getElementById('page-desc').textContent = desc;
   // each visit gets its own container: a tab still loading when the user switches away fills a detached node, not the new tab
   const host = document.createElement('div');
   panel.replaceChildren(host);
-  try { await mounts[tab](host); } catch (e) { host.innerHTML = '<div class="card err">โหลดหน้านี้ไม่สำเร็จ</div>'; console.error(e); }
+  try { await mounts[tab](host, access); } catch (e) { host.innerHTML = '<div class="card err">โหลดหน้านี้ไม่สำเร็จ</div>'; console.error(e); }
 }
 document.getElementById('nav').addEventListener('click', (e) => {
   const tab = e.target.dataset.tab;

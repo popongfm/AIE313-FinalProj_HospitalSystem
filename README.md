@@ -20,13 +20,22 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
    ```
 2. SQL editor: `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
+   **อัปเดตโปรเจกต์ที่ลง schema ไปแล้ว:** รันไฟล์ใน `db/migrations/` ที่ยังไม่เคยรันตามลำดับวันที่ (แต่ละไฟล์เป็น transaction เดียว) **ก่อน** deploy Edge Function เวอร์ชันเดียวกัน เช่น `2026-11-10_patient_portal.sql` (สิทธิ์บัญชีผู้ป่วย) โปรเจกต์ใหม่ใช้แค่ `schema.sql` + `seed.sql`
 3. **Auth** (หน้าเว็บมีปุ่มสมัครสมาชิกตามที่โจทย์กำหนด):
    - Authentication → Sign In / Providers: **เปิด "Allow new users to sign up"** ไว้
    - **"Confirm email"**: สำหรับ demo ให้ปิดไว้ เพราะ SMTP เริ่มต้นของ Supabase ส่งอีเมลยืนยันได้เฉพาะอีเมลของสมาชิกในโปรเจกต์ ถ้าจะเปิดไว้ต้องตั้ง SMTP เอง
    - หลังได้ URL จาก Render (ขั้นที่ 3) ให้ใส่ใน Authentication → URL Configuration: **Site URL** และ **Redirect URLs** = `https://<ชื่อ service>.onrender.com`
-   - บัญชีที่สมัครใหม่ **ยังไม่เห็นข้อมูล** (RLS, view และ chat เช็คสิทธิ์ทั้งหมด) จนกว่า admin จะผูกบัญชีกับ profile ที่ไม่ใช่ patient ใน SQL editor (ดู uuid ได้ที่ Authentication → Users):
+   - บัญชีที่สมัครใหม่ **ยังไม่เห็นข้อมูล** (RLS, view และ chat เช็คสิทธิ์ทั้งหมด) จนกว่า admin จะผูกบัญชีกับ profile ใน SQL editor (ดู uuid ได้ที่ Authentication → Users):
      `INSERT INTO profiles(user_id, role) VALUES ('<auth user uuid>', 'admin');`
      `INSERT INTO profiles(user_id, role, staff_id) VALUES ('<auth user uuid>', 'doctor', <staff_id>);` (หรือ `pharmacist` / `nurse`)
+     `INSERT INTO profiles(user_id, role, patient_id) VALUES ('<auth user uuid>', 'patient', <patient_id>);` (บัญชีผู้ป่วย)
+   - สิทธิ์ตาม profile:
+
+     | บัญชี | ตาราง (CRUD) | รายงาน / Dashboard / Chat |
+     |---|---|---|
+     | ไม่มี profile | ไม่เห็นอะไร | ไม่เห็นอะไร / chat ตอบ 403 |
+     | `patient` | เห็นเฉพาะของตัวเองใน `patient`, `booking`, `visit`, `prescription`; จองคิว (ระบบใส่เลขคิวให้) และยกเลิกคิวของตัวเอง; แก้ได้เฉพาะเบอร์โทร อีเมล ที่อยู่ | view รายคน (คิววันนี้ ค่ารักษา ใบสั่งยา) เฉพาะของตัวเอง, view ภาพรวมเห็นทั้งหมด; chat ตอบจากข้อมูลชุดเดียวกันนี้ |
+     | `admin`, `doctor`, `pharmacist`, `nurse` | ทุกตาราง | ทุกแถว |
 4. **Edge Functions** (ต้องมี Supabase CLI: `brew install supabase/tap/supabase` แล้ว `supabase login`) รันในโฟลเดอร์ repo
    chat หลักคือ **MCP (วิธี C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, วิธี B) เป็นตัวสำรอง:
    `supabase functions deploy chat-mcp --project-ref <ref>` (และ `chat` ถ้าต้องการ)

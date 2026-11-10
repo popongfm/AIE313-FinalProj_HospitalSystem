@@ -4,7 +4,7 @@ export function coerceRow(cfg, values) {
   for (const c of cfg.cols) {
     const raw = values[c.name] == null ? '' : String(values[c.name]).trim();
     if (raw === '') { if (c.required) missing.push(c.name); row[c.name] = null; continue; }
-    if (c.type === 'number') {
+    if (c.type === 'number' || c.numeric) {
       const n = Number(raw);
       if (Number.isNaN(n)) { missing.push(c.name); continue; }
       row[c.name] = n;

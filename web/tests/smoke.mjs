@@ -20,13 +20,13 @@ const DB = { patient: [{ patient_id: 1, hn: 'HN1', national_id: '1100000000001',
   v_doctor_workload: [{ doctor_name: 'ก', status: 'pending', booking_count: 2 }, { doctor_name: 'ก', status: 'completed', booking_count: 1 }],
   v_visit_billing: [{ department: 'อายุรกรรม', month: '2026-10', total_amount: 100 }, { department: 'อายุรกรรม', month: '2026-10', total_amount: 50 }],
   v_inventory_stock_status: [{ generic_name: 'Warfarin', lot_number: 'L1', quantity_on_hand: 20, reorder_point: 100, stock_status: 'REORDER_URGENT' }], booking: [],
-  profiles: [{ user_id: 'u-admin', role: 'admin' }] };
+  profiles: [{ user_id: 'u-admin', role: 'admin' }, { user_id: 'u-patient', role: 'patient', patient_id: 1 }], visit: [{ visit_id: 5, patient_id: 1, visit_type: 'OPD' }] };
 const sess = () => JSON.parse(localStorage.getItem('mock_session') || 'null');
 export function createClient() {
   const qb = (table) => { const st = { op: 'select', filters: [] };
     const b = { select() { return b; }, maybeSingle() { st.single = true; return b; }, order() { return b; }, limit() { return b; }, eq(k, v) { st.filters.push([k, v]); return b; },
-      insert(row) { st.op = 'insert'; st.row = row; return b; }, update() { st.op = 'update'; return b; }, delete() { st.op = 'delete'; return b; },
-      then(res) { if (st.op === 'insert' && table === 'booking') return res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } });
+      insert(row) { st.op = 'insert'; st.row = row; window.__lastInsert = row; return b; }, update() { st.op = 'update'; return b; }, delete() { st.op = 'delete'; return b; },
+      then(res) { if (st.op === 'insert' && table === 'booking' && st.row.queue_no != null) return res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } });
         if (st.op === 'delete' && table === 'patient') return res({ data: null, error: { code: '23503', message: 'violates foreign key' } });
         if (st.op === 'insert') { DB[table] = [...(DB[table] || []), st.row]; return res({ data: null, error: null }); }
         let rows = DB[table] || []; st.filters.forEach(([k, v]) => { rows = rows.filter((r) => r[k] === v); }); res({ data: st.single ? (rows[0] || null) : rows, error: null }); } };
@@ -35,9 +35,10 @@ export function createClient() {
     if (body.question.includes('ลบ')) return { data: { answer: '', sql: 'DELETE FROM patient', columns: [], rows: [], error: 'อนุญาตเฉพาะคำสั่ง SELECT เท่านั้น' }, error: null };
     if (body.question.includes('ว่าง')) return { data: { answer: 'ไม่พบข้อมูลที่ตรงกับคำถาม', sql: 'select 1', columns: [], rows: [], error: null }, error: null };
     return { data: { answer: 'มีแพทย์ 8 คน', sql: 'select count(*) as n from v_doctor_workload LIMIT 100', columns: ['n'], rows: [{ n: 8 }], error: null }, error: null }; };
-  return { from: qb, functions: { invoke }, auth: {
+  const rpc = async (name) => ({ data: name === 'doctor_directory' ? [{ staff_id: 7, doctor_name: 'แพทย์ ทดสอบ', department: 'อายุรกรรม' }] : null, error: null });
+  return { from: qb, rpc, functions: { invoke }, auth: {
     async signInWithPassword({ email, password }) { if (password !== 'secret1') return { error: { message: 'Invalid login credentials' } };
-      localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'new@b.th' ? 'u-new' : 'u-admin' } })); return { error: null }; },
+      localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'new@b.th' ? 'u-new' : email === 'pt@b.th' ? 'u-patient' : 'u-admin' } })); return { error: null }; },
     async signUp({ email }) { window.__signups = (window.__signups || 0) + 1;
       if (email === 'a@b.th') return { data: { user: { identities: [] }, session: null }, error: null };   // existing e-mail, confirm-email on
       return { data: { user: { identities: [{}] }, session: null }, error: null }; },
@@ -113,6 +114,24 @@ await check('account without an approved profile sees the pending notice', async
   await page.click('#logout'); await page.waitForURL('**/index.html');
   await page.fill('#email', 'new@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html');
   await page.waitForSelector('#pending'); assert.ok((await page.textContent('#pending')).includes('ยังไม่ได้รับสิทธิ์')); });
+await check('patient account: own-record tables only, book with a doctor list, no add/edit on read-only tables', async () => {
+  await page.goto(base + '/index.html'); await page.evaluate(() => localStorage.removeItem('mock_session')); await page.goto(base + '/index.html');
+  await page.fill('#email', 'pt@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html*');
+  await page.waitForSelector('#t'); assert.equal(await page.locator('#pending').count(), 0);
+  assert.equal(await page.textContent('#page-title'), 'ข้อมูลของฉัน');
+  assert.deepEqual(await page.$$eval('#t option', (o) => o.map((x) => x.value)), ['patient', 'booking', 'visit', 'prescription']);
+  assert.equal(await page.isVisible('#new'), false, 'patients cannot add patient rows');
+  await page.selectOption('#t', 'visit'); await page.waitForSelector('#list table');
+  assert.equal(await page.locator('#list th', { hasText: 'จัดการ' }).count(), 0, 'visits are read-only');
+  assert.equal(await page.isVisible('#new'), false);
+  await page.selectOption('#t', 'booking'); await page.waitForFunction(() => document.querySelector('#list').textContent !== 'กำลังโหลด...');
+  assert.equal(await page.isVisible('#new'), true); assert.equal(await page.textContent('#new'), '+ จองคิว'); await page.click('#new');
+  assert.deepEqual(await page.$$eval('#f_staff_id option', (o) => o.map((x) => x.textContent)), ['', 'แพทย์ ทดสอบ (อายุรกรรม)']);
+  assert.ok(await page.getAttribute('#f_booking_date', 'min'), 'no booking in the past');
+  assert.equal(await page.locator('#f_queue_no, #f_patient_id, #f_status').count(), 0, 'set by the database');
+  await page.selectOption('#f_staff_id', '7'); await page.fill('#f_booking_date', '2099-01-02'); await page.fill('#f_booking_time', '10:30');
+  await page.click('#form button[type=submit]'); await page.waitForSelector('#form', { state: 'hidden' });
+  assert.deepEqual(await page.evaluate(() => window.__lastInsert), { staff_id: 7, booking_date: '2099-01-02', booking_time: '10:30', symptom: null }); });
 await check('no uncaught page errors', async () => { assert.deepEqual(errors, [], JSON.stringify(errors)); });
 console.log(results.join('\n'));
 await browser.close(); server.close();

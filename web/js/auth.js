@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient.js';
-import { authMessage, signUpResult, hasAppAccess } from './authMessages.js';
+import { authMessage, signUpResult, accessFromProfile } from './authMessages.js';
 
 // New accounts can sign up, but see no data until an admin links them to a staff/admin row in profiles.
 export async function signUp(email, password) {
@@ -21,12 +21,12 @@ export async function requireSession() {
   if (!data.session) { location.replace('index.html'); return null; }
   return data.session;
 }
-// false when this account is not yet linked to a staff/admin profile. RLS already hides the data;
-// this only lets the page explain why everything is empty. Unknown (no id, query error) counts as allowed.
-export async function hasAccess(session) {
+// The account's access ({ linked, role, patient }) from its own profiles row. RLS enforces it in the database; the page
+// only uses it to show the right menus and to explain an empty screen. Unknown (no id, query error) counts as staff.
+export async function getAccess(session) {
   const uid = session && session.user && session.user.id;
-  if (!uid) return true;
+  if (!uid) return accessFromProfile({ role: null });
   const { data, error } = await supabase.from('profiles').select('role').eq('user_id', uid).maybeSingle();
-  if (error) return true;
-  return hasAppAccess(data);
+  if (error) return accessFromProfile({ role: null });
+  return accessFromProfile(data);
 }
