@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { friendlyError } from './errors.js';
-import { pivot, sumBy } from './helpers.js';
+import { pivot, sumBy, countDistinctBy } from './helpers.js';
+import { chartsFor } from './roleUi.js';
 
 const PALETTE = ['#0f6b5e', '#9a5d0c', '#2f5d9e', '#74467f', '#6c7a86', '#b4232f'];   // same zone colours as css/app.css
 function loadChartJs() {
@@ -22,31 +23,68 @@ function draw(c, config, hasData) {
 }
 const datasets = (p, type) => Object.entries(p.series).map(([name, data], i) => ({ label: name, data, backgroundColor: PALETTE[i % PALETTE.length], borderColor: PALETTE[i % PALETTE.length], type }));
 
-export async function mountDashboard(el) {
-  await loadChartJs();
-  const msg = document.createElement('div'); msg.className = 'err'; el.appendChild(msg);
-  const grid = document.createElement('div'); grid.className = 'charts'; el.appendChild(grid);
-
+// One builder per chart id (ids from roleUi.js chartsFor). Each makes its card, queries, and draws; a failing query shows
+// its error in the shared message line and the card's "ไม่พบข้อมูล", so the other charts still draw.
+const byMonth = (x, y) => String(x.month).localeCompare(String(y.month));
+async function query(msg, q) {
+  const r = await q;
+  if (r.error) { msg.textContent = friendlyError(r.error); return []; }
+  return r.data || [];
+}
+const CHARTS = {
   // D1: bookings per doctor per status  (analysis Q17)
-  const d1 = card(grid, 'D1 จำนวนการจองต่อแพทย์ แยกตามสถานะ');
-  const r1 = await supabase.from('v_doctor_workload').select('doctor_name,status,booking_count');
-  if (r1.error) msg.textContent = friendlyError(r1.error);
-  const p1 = pivot(r1.data || [], 'doctor_name', 'status', 'booking_count');
-  draw(d1, { type: 'bar', data: { labels: p1.labels, datasets: datasets(p1, 'bar') }, options: { scales: { x: { stacked: true }, y: { stacked: true } } } }, (r1.data || []).length > 0);
-
+  async workload(grid, msg) {
+    const c = card(grid, 'D1 จำนวนการจองต่อแพทย์ แยกตามสถานะ');
+    const rows = await query(msg, supabase.from('v_doctor_workload').select('doctor_name,status,booking_count'));
+    const p = pivot(rows, 'doctor_name', 'status', 'booking_count');
+    draw(c, { type: 'bar', data: { labels: p.labels, datasets: datasets(p, 'bar') }, options: { scales: { x: { stacked: true }, y: { stacked: true } } } }, rows.length > 0);
+  },
   // D2: monthly billing per department  (analysis Q18)
-  const d2 = card(grid, 'D2 ค่ารักษารายเดือน แยกตามแผนก (บาท)');
-  const r2 = await supabase.from('v_visit_billing').select('department,month,total_amount');
-  if (r2.error) msg.textContent = friendlyError(r2.error);
-  const p2 = pivot(sumBy(r2.data || [], ['department', 'month'], 'total_amount').sort((x, y) => String(x.month).localeCompare(String(y.month))), 'month', 'department', 'total');   // months in calendar order
-  draw(d2, { type: 'bar', data: { labels: p2.labels, datasets: datasets(p2, 'bar') } }, (r2.data || []).length > 0);
-
+  async billing(grid, msg) {
+    const c = card(grid, 'D2 ค่ารักษารายเดือน แยกตามแผนก (บาท)');
+    const rows = await query(msg, supabase.from('v_visit_billing').select('department,month,total_amount'));
+    const p = pivot(sumBy(rows, ['department', 'month'], 'total_amount').sort(byMonth), 'month', 'department', 'total');   // months in calendar order
+    draw(c, { type: 'bar', data: { labels: p.labels, datasets: datasets(p, 'bar') } }, rows.length > 0);
+  },
   // D3: drugs below reorder point  (analysis Q19)
-  const d3 = card(grid, 'D3 ยาที่ต่ำกว่าจุดสั่งซื้อ');
-  const r3 = await supabase.from('v_inventory_stock_status').select('generic_name,lot_number,quantity_on_hand,reorder_point').eq('stock_status', 'REORDER_URGENT').order('quantity_on_hand');
-  if (r3.error) msg.textContent = friendlyError(r3.error);
-  const rows3 = r3.data || [];
-  draw(d3, { type: 'bar', data: { labels: rows3.map((r) => `${r.generic_name} (${r.lot_number})`),
-    datasets: [{ label: 'คงเหลือ', data: rows3.map((r) => r.quantity_on_hand), backgroundColor: PALETTE[0] }, { label: 'จุดสั่งซื้อ', data: rows3.map((r) => r.reorder_point), backgroundColor: PALETTE[1] }] },
-    options: { indexAxis: 'y' } }, rows3.length > 0);
+  async lowStock(grid, msg) {
+    const c = card(grid, 'D3 ยาที่ต่ำกว่าจุดสั่งซื้อ');
+    const rows = await query(msg, supabase.from('v_inventory_stock_status').select('generic_name,lot_number,quantity_on_hand,reorder_point').eq('stock_status', 'REORDER_URGENT').order('quantity_on_hand'));
+    draw(c, { type: 'bar', data: { labels: rows.map((r) => `${r.generic_name} (${r.lot_number})`),
+      datasets: [{ label: 'คงเหลือ', data: rows.map((r) => r.quantity_on_hand), backgroundColor: PALETTE[0] }, { label: 'จุดสั่งซื้อ', data: rows.map((r) => r.reorder_point), backgroundColor: PALETTE[1] }] },
+      options: { indexAxis: 'y' } }, rows.length > 0);
+  },
+  // D4: beds in use and free per department
+  async beds(grid, msg) {
+    const c = card(grid, 'D4 เตียงที่ใช้อยู่และว่าง แยกตามแผนก');
+    const rows = (await query(msg, supabase.from('v_bed_occupancy').select('department,occupied_beds,available_beds')))
+      .map((r) => ({ ...r, department: r.department ?? 'ไม่ระบุแผนก' }));
+    const used = sumBy(rows, ['department'], 'occupied_beds'), free = sumBy(rows, ['department'], 'available_beds');   // same first-seen order
+    draw(c, { type: 'bar', data: { labels: used.map((r) => r.department),
+      datasets: [{ label: 'ใช้อยู่', data: used.map((r) => r.total), backgroundColor: PALETTE[0] }, { label: 'ว่าง', data: free.map((r) => r.total), backgroundColor: PALETTE[4] }] },
+      options: { scales: { x: { stacked: true }, y: { stacked: true } } } }, rows.length > 0);
+  },
+  // D5: prescriptions waiting for pharmacist screening, per status (the view has one row per item, so count prescriptions)
+  async screening(grid, msg) {
+    const c = card(grid, 'D5 ใบสั่งยารอคัดกรอง แยกตามสถานะ');
+    const rows = await query(msg, supabase.from('v_pharmacist_screening_queue').select('prescription_id,prescription_status'));
+    const g = countDistinctBy(rows, 'prescription_status', 'prescription_id');
+    draw(c, { type: 'bar', data: { labels: g.map((r) => r.key), datasets: [{ label: 'ใบสั่งยา', data: g.map((r) => r.count), backgroundColor: PALETTE[2] }] } }, rows.length > 0);
+  },
+  // patient: own monthly charges (RLS returns only this patient's rows of v_visit_billing)
+  async myBilling(grid, msg) {
+    const c = card(grid, 'ค่ารักษาของฉันรายเดือน (บาท)');
+    const rows = await query(msg, supabase.from('v_visit_billing').select('month,total_amount'));
+    const m = sumBy(rows, ['month'], 'total_amount').sort(byMonth);
+    draw(c, { type: 'bar', data: { labels: m.map((r) => r.month), datasets: [{ label: 'ค่ารักษา', data: m.map((r) => r.total), backgroundColor: PALETTE[0] }] } }, rows.length > 0);
+  },
+};
+
+export async function mountDashboard(el, access = {}) {
+  await loadChartJs();
+  const msg = document.createElement('div'); msg.className = 'err'; msg.setAttribute('role', 'alert'); el.appendChild(msg);
+  const grid = document.createElement('div'); grid.className = 'charts'; el.appendChild(grid);
+  for (const id of chartsFor(access.role)) {
+    try { await CHARTS[id](grid, msg); } catch (e) { msg.textContent = friendlyError(e); console.error(e); }
+  }
 }

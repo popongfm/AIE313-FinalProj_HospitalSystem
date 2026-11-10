@@ -2,7 +2,7 @@ import { requireSession, signOut, getAccess } from './auth.js';
 const mounts = {
   data:  async (el, access) => (await import('./crud.js')).mountCrudPage(el, access),
   views: async (el) => (await import('./views.js')).mountViewsPage(el),
-  dash:  async (el) => (await import('./dashboard.js')).mountDashboard(el),
+  dash:  async (el, access) => (await import('./dashboard.js')).mountDashboard(el, access),
   chat:  async (el) => (await import('./chat.js')).mountChat(el),
 };
 const HEADINGS = {

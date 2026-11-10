@@ -20,13 +20,16 @@ const DB = { patient: [{ patient_id: 1, hn: 'HN1', national_id: '1100000000001',
   v_doctor_workload: [{ doctor_name: 'ก', status: 'pending', booking_count: 2 }, { doctor_name: 'ก', status: 'completed', booking_count: 1 }],
   v_visit_billing: [{ department: 'อายุรกรรม', month: '2026-10', total_amount: 100 }, { department: 'อายุรกรรม', month: '2026-10', total_amount: 50 }],
   v_inventory_stock_status: [{ generic_name: 'Warfarin', lot_number: 'L1', quantity_on_hand: 20, reorder_point: 100, stock_status: 'REORDER_URGENT' }], booking: [],
-  profiles: [{ user_id: 'u-admin', role: 'admin' }, { user_id: 'u-patient', role: 'patient', patient_id: 1 }], visit: [{ visit_id: 5, patient_id: 1, visit_type: 'OPD' }] };
+  v_bed_occupancy: [{ department: 'อายุรกรรม', occupied_beds: 3, available_beds: 1 }, { department: 'อายุรกรรม', occupied_beds: 1, available_beds: 1 }, { department: null, occupied_beds: 0, available_beds: 2 }],
+  v_pharmacist_screening_queue: [{ prescription_id: 1, prescription_status: 'Pending' }, { prescription_id: 1, prescription_status: 'Pending' }, { prescription_id: 2, prescription_status: 'Screened' }],
+  profiles: [{ user_id: 'u-admin', role: 'admin' }, { user_id: 'u-patient', role: 'patient', patient_id: 1 }, { user_id: 'u-pharm', role: 'pharmacist' }, { user_id: 'u-nurse', role: 'nurse' }], visit: [{ visit_id: 5, patient_id: 1, visit_type: 'OPD' }] };
 const sess = () => JSON.parse(localStorage.getItem('mock_session') || 'null');
 export function createClient() {
   const qb = (table) => { const st = { op: 'select', filters: [] };
     const b = { select() { return b; }, maybeSingle() { st.single = true; return b; }, order() { return b; }, limit() { return b; }, eq(k, v) { st.filters.push([k, v]); return b; },
       insert(row) { st.op = 'insert'; st.row = row; window.__lastInsert = row; return b; }, update() { st.op = 'update'; return b; }, delete() { st.op = 'delete'; return b; },
-      then(res) { if (st.op === 'insert' && table === 'booking' && st.row.queue_no != null) return res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } });
+      then(res) { if (window.__failView === table) return res({ data: null, error: { code: '42P01', message: 'relation does not exist' } });
+        if (st.op === 'insert' && table === 'booking' && st.row.queue_no != null) return res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } });
         if (st.op === 'delete' && table === 'patient') return res({ data: null, error: { code: '23503', message: 'violates foreign key' } });
         if (st.op === 'insert') { DB[table] = [...(DB[table] || []), st.row]; return res({ data: null, error: null }); }
         let rows = DB[table] || []; st.filters.forEach(([k, v]) => { rows = rows.filter((r) => r[k] === v); }); res({ data: st.single ? (rows[0] || null) : rows, error: null }); } };
@@ -38,7 +41,7 @@ export function createClient() {
   const rpc = async (name) => ({ data: name === 'doctor_directory' ? [{ staff_id: 7, doctor_name: 'แพทย์ ทดสอบ', department: 'อายุรกรรม' }] : null, error: null });
   return { from: qb, rpc, functions: { invoke }, auth: {
     async signInWithPassword({ email, password }) { if (password !== 'secret1') return { error: { message: 'Invalid login credentials' } };
-      localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'new@b.th' ? 'u-new' : email === 'pt@b.th' ? 'u-patient' : 'u-admin' } })); return { error: null }; },
+      localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'new@b.th' ? 'u-new' : email === 'pt@b.th' ? 'u-patient' : email === 'ph@b.th' ? 'u-pharm' : email === 'ns@b.th' ? 'u-nurse' : 'u-admin' } })); return { error: null }; },
     async signUp({ email }) { window.__signups = (window.__signups || 0) + 1;
       if (email === 'a@b.th') return { data: { user: { identities: [] }, session: null }, error: null };   // existing e-mail, confirm-email on
       return { data: { user: { identities: [{}] }, session: null }, error: null }; },
@@ -88,9 +91,15 @@ await check('duplicate booking shows Thai duplicate error', async () => {
 await check('views page shows rows, and ไม่พบข้อมูล for an empty view', async () => {
   await page.click('[data-tab=views]'); await page.selectOption('#v', 'v_top_diagnosis'); await page.waitForSelector('#out table');
   await page.selectOption('#v', 'v_feedback_summary'); await page.waitForFunction(() => document.getElementById('out').textContent.includes('ไม่พบข้อมูล')); });
-await check('dashboard draws 3 charts with merged D2 totals', async () => {
-  await page.click('[data-tab=dash]'); await page.waitForFunction(() => (window.__charts || []).length === 3);
-  const d2 = await page.evaluate(() => window.__charts[1].data.datasets[0].data); assert.deepEqual(d2, [150]); });
+const headings = () => page.$$eval('#panel h3', (h) => h.map((x) => x.textContent));
+await check('admin dashboard draws all 5 staff charts in order', async () => {
+  await page.evaluate(() => { window.__charts = []; });
+  await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 5);
+  assert.deepEqual((await headings()).map((h) => h.slice(0, 2)), ['D1', 'D2', 'D3', 'D4', 'D5']);
+  const c = await page.evaluate(() => window.__charts.map((x) => ({ labels: x.data.labels, data: x.data.datasets.map((d) => d.data) })));
+  assert.deepEqual(c[1].data[0], [150]);
+  assert.deepEqual(c[3], { labels: ['อายุรกรรม', 'ไม่ระบุแผนก'], data: [[4, 0], [2, 2]] });
+  assert.deepEqual(c[4], { labels: ['Pending', 'Screened'], data: [[1, 1]] }); });
 await check('chat: answer, SQL evidence and raw table are shown; input disabled while processing', async () => {
   await page.click('[data-tab=chat]'); await page.fill('#q', 'มีแพทย์กี่คน'); await page.click('#send');
   assert.equal(await page.isDisabled('#send'), true); assert.ok((await page.textContent('#log')).includes('กำลังประมวลผล'));
@@ -132,6 +141,21 @@ await check('patient account: own-record tables only, book with a doctor list, n
   await page.selectOption('#f_staff_id', '7'); await page.fill('#f_booking_date', '2099-01-02'); await page.fill('#f_booking_time', '10:30');
   await page.click('#form button[type=submit]'); await page.waitForSelector('#form', { state: 'hidden' });
   assert.deepEqual(await page.evaluate(() => window.__lastInsert), { staff_id: 7, booking_date: '2099-01-02', booking_time: '10:30', symptom: null }); });
+const loginAs = async (email) => {
+  await page.goto(base + '/index.html'); await page.evaluate(() => localStorage.removeItem('mock_session')); await page.goto(base + '/index.html');
+  await page.fill('#email', email); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html*'); await page.waitForSelector('#t'); };
+await check('pharmacist dashboard shows only D5 then D3', async () => {
+  await loginAs('ph@b.th'); await page.evaluate(() => { window.__charts = []; });
+  await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 2);
+  assert.deepEqual(await headings(), ['D5 ใบสั่งยารอคัดกรอง แยกตามสถานะ', 'D3 ยาที่ต่ำกว่าจุดสั่งซื้อ']); });
+await check('nurse dashboard: one failing chart does not block the other', async () => {
+  await loginAs('ns@b.th'); await page.evaluate(() => { window.__charts = []; window.__failView = 'v_bed_occupancy'; });
+  await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 1);
+  assert.deepEqual((await headings()).map((h) => h.slice(0, 2)), ['D4', 'D1']);
+  assert.equal(await page.evaluate(() => window.__charts[0].data.datasets[0].label), 'pending');
+  assert.ok((await page.textContent('#panel .err')).length > 0, 'error shown');
+  assert.equal(await page.isVisible('#panel .card:first-child .empty'), true, 'D4 shows ไม่พบข้อมูล');
+  await page.evaluate(() => { window.__failView = null; }); });
 await check('no uncaught page errors', async () => { assert.deepEqual(errors, [], JSON.stringify(errors)); });
 console.log(results.join('\n'));
 await browser.close(); server.close();
