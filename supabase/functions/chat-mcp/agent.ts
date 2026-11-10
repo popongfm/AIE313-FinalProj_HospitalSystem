@@ -41,7 +41,8 @@ export async function handleMcpChat(deps: AgentDeps, question: string, user: { i
     for (let step = 0; step < MAX_STEPS; step++) {
       let reply: AssistantMsg;
       try { reply = await deps.llm(messages, tools); }
-      catch { await log({ error: 'llm_unavailable' }); return fail('ระบบ AI ไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง'); }
+      catch (e) { const why = String((e as Error)?.message ?? e).slice(0, 300); console.error('[chat-mcp] LLM call failed:', why);
+        await log({ error: `llm_unavailable: ${why}` }); return fail('ระบบ AI ไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง'); }
       if (!reply.tool_calls?.length) { answer = (reply.content ?? '').trim(); break; }
       messages.push({ role: 'assistant', content: reply.content ?? null, tool_calls: reply.tool_calls });
       for (const tc of reply.tool_calls) {

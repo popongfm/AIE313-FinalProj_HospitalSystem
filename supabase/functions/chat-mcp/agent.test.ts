@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { handleMcpChat, type AgentDeps, type AssistantMsg, type Msg } from './agent.ts';
-import { makeLlm } from './llmTools.ts';
+import { makeLlm, DEFAULT_MODEL } from './llmTools.ts';
 
 const call = (name: string, args: unknown, id = 'c1'): AssistantMsg => ({ role: 'assistant', content: null, tool_calls: [{ id, function: { name, arguments: JSON.stringify(args) } }] });
 const say = (content: string): AssistantMsg => ({ role: 'assistant', content });
@@ -72,4 +72,18 @@ test('makeLlm sends tools and parses tool_calls; HTTP errors throw', async () =>
   assert.equal(m.tool_calls?.[0].function.name, 'list_views'); assert.equal(body.tool_choice, 'auto');
   const no = makeLlm((async () => new Response('x', { status: 500 })) as typeof fetch, { apiKey: 'k' });
   await assert.rejects(() => no([], []));
+});
+test('LLM failure: the user gets the Thai message, chat_logs and the function log get the reason', async () => {
+  const logs: Record<string, unknown>[] = [];
+  const retired = makeLlm((async () => new Response(JSON.stringify({ error: { code: 'model_not_found', message: 'The model `llama-3.3-70b-versatile` does not exist' } }), { status: 404 })) as typeof fetch, { apiKey: 'secret-key' });
+  const r = await handleMcpChat({ llm: retired, runQuery: async () => [], log: async (e) => { logs.push(e); } }, 'q', U);
+  assert.equal(r.error, 'ระบบ AI ไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง');
+  assert.equal(logs[0].error, 'llm_unavailable: LLM request failed: 404 model_not_found: The model `llama-3.3-70b-versatile` does not exist');
+  assert.ok(!JSON.stringify(logs).includes('secret-key'));
+});
+test('makeLlm defaults to a model Groq still serves (LLM_MODEL overrides it)', async () => {
+  let body: any;
+  const llm = makeLlm((async (_u: string, init: any) => { body = JSON.parse(init.body); return new Response(JSON.stringify({ choices: [{ message: { content: 'ok' } }] })); }) as typeof fetch, { apiKey: 'k' });
+  await llm([{ role: 'user', content: 'hi' }], []);
+  assert.equal(DEFAULT_MODEL, 'openai/gpt-oss-120b'); assert.equal(body.model, Deno.env.get('LLM_MODEL') ?? DEFAULT_MODEL);
 });
