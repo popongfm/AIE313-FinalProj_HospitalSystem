@@ -7,8 +7,10 @@
   --danger: #b4232f; --danger-soft: #fbeaea;
   --z-appt: #2f5d9e; --z-rec: #0f6b5e; --z-rx: #9a5d0c; --z-rep: #74467f;
   --shadow: 0 24px 48px -28px rgba(6, 38, 33, .55);
-  --f-body: "IBM Plex Sans Thai", system-ui, "Sarabun", sans-serif;
-  --f-display: "Noto Serif Thai", "IBM Plex Sans Thai", Georgia, serif;
+  /* web fonts first; then Thai system fonts (Android/Linux, Windows, macOS/iOS) so text stays one face if Google Fonts fails */
+  --f-body: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", "Thonburi", "Sarabun", system-ui, sans-serif;
+  --f-display: "Noto Serif Thai", "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", "Thonburi", sans-serif;
+  --col-shadow: rgb(6 38 33 / .16);   /* edge of the pinned edit/delete column */
   --wrap: 1160px;
   color-scheme: light;
 }
@@ -19,6 +21,7 @@
     --deep: #0a2a25; --deep-2: #0f3a33;
     --danger: #f08a8a; --danger-soft: #3a1c1f;
     --shadow: 0 24px 48px -28px rgba(0, 0, 0, .8);
+    --col-shadow: rgb(0 0 0 / .6);
     color-scheme: dark;
   }
 }
@@ -219,7 +222,13 @@ tbody tr:hover td { background: var(--scrub-soft); }
 tbody tr:last-child td { border-bottom: 0; }
 td .row { margin: 0; gap: 6px; flex-wrap: nowrap; }
 td button { padding: 2px 10px; font-size: 14px; line-height: 1.5; }
-table.has-actions th:last-child, table.has-actions td:last-child { position: sticky; right: 0; background: var(--paper); box-shadow: -1px 0 0 var(--line); }
+/* the pinned column casts a shadow to the left, so it is clear that more columns scroll underneath it.
+   Drawn with ::before because Chromium does not paint box-shadow on cells of a border-collapse table. */
+table.has-actions th:last-child, table.has-actions td:last-child { position: sticky; right: 0; background: var(--paper); border-left: 1px solid var(--line); }
+table.has-actions th:last-child::before, table.has-actions td:last-child::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -12px; width: 12px; pointer-events: none;
+  background: linear-gradient(to left, var(--col-shadow), transparent); }
+@media (max-width: 720px) { td button { padding: 2px 8px; font-size: 13px; } }
 table.has-actions th:last-child { background: var(--mist); z-index: 2; }
 table.has-actions tbody tr:hover td:last-child { background: var(--scrub-soft); }
 
