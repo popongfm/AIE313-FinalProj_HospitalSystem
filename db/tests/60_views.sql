@@ -1,10 +1,10 @@
 -- Task 6: the 9 allowlisted views.
 DO $$
 DECLARE v text; n bigint;
-  names text[] := ARRAY['v_booking_queue_today','v_doctor_workload','v_feedback_summary','v_bed_occupancy','v_visit_billing',
+  names text[] := ARRAY['v_booking_queue_today','v_upcoming_bookings','v_doctor_workload','v_feedback_summary','v_bed_occupancy','v_visit_billing',
                         'v_top_diagnosis','v_pharmacist_screening_queue','v_inventory_stock_status','v_drug_cost_summary'];
 BEGIN
-  ASSERT (SELECT count(*) FROM pg_views WHERE schemaname = 'public') = 9, 'expected exactly 9 views in public';
+  ASSERT (SELECT count(*) FROM pg_views WHERE schemaname = 'public') = 10, 'expected exactly 10 views in public';
   FOREACH v IN ARRAY names LOOP
     ASSERT to_regclass('public.' || v) IS NOT NULL, 'missing view ' || v;
     EXECUTE format('SELECT count(*) FROM %I', v) INTO n;

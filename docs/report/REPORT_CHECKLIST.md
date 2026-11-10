@@ -8,7 +8,7 @@
 | 5.2 ER-Diagram | `docs/er/er_full.png`, `er_member_{A,B,C}_*.png`, `er_core_shared.png` | ใส่รูปและอธิบายตารางกลาง (patient, staff, department, visit) |
 | 5.3 Relational Schema | `schema.sql` (22 ตาราง) | แปลงเป็นตารางในรายงาน; A: booking, feedback · C: room, bed, visit, admission, diagnosis, lab_result, insurance_coverage, daily_charge · B: drug, drug_lot, prescription, prescription_item, dispense_record, inventory, drug_allergy_record · กลาง: department, staff, patient, profiles, chat_logs |
 | 5.4 Normalization | ตัวอย่าง: `booking` (นัดหมาย) หรือ `visit`/`daily_charge` | เขียน 1NF→2NF→3NF อย่างน้อย 1 ตัวอย่าง |
-| 5.5 Views (≥6) | 9 views ใน `db/05_views.sql` | อธิบายแต่ละ view และ SQL |
+| 5.5 Views (≥6) | 10 views ใน `db/05_views.sql` | อธิบายแต่ละ view และ SQL |
 | 5.6 SQL Script | `schema.sql`, `seed.sql` | แนบไฟล์ |
 | 6 SQL วิเคราะห์ | `analysis/analysis_queries.sql` (19 คำสั่ง), `docs/report/analysis.md` | เติม "การแปลความหมาย" ทุกข้อ และจับภาพผลลัพธ์ |
 | 7 Web App | `web/` | ถ่ายภาพหน้าจอ Registration/Login/CRUD/Views/Dashboard จากระบบที่ deploy แล้ว (รวมข้อความ "ยังไม่ได้รับสิทธิ์" ของบัญชีที่เพิ่งสมัคร) |

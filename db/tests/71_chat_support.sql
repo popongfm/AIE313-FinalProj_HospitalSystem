@@ -1,10 +1,10 @@
 -- Task 7: chat_logs, chat_reader role, run_readonly_query RPC.
 DO $$
 DECLARE v text; n int;
-  names text[] := ARRAY['v_booking_queue_today','v_doctor_workload','v_feedback_summary','v_bed_occupancy','v_visit_billing',
+  names text[] := ARRAY['v_booking_queue_today','v_upcoming_bookings','v_doctor_workload','v_feedback_summary','v_bed_occupancy','v_visit_billing',
                         'v_top_diagnosis','v_pharmacist_screening_queue','v_inventory_stock_status','v_drug_cost_summary'];
 BEGIN
-  -- chat_reader: SELECT on the 9 views only, nothing on base tables
+  -- chat_reader: SELECT on the 10 views only, nothing on base tables
   FOREACH v IN ARRAY names LOOP
     ASSERT has_table_privilege('chat_reader', 'public.' || v, 'SELECT'), 'chat_reader must read ' || v;
   END LOOP;

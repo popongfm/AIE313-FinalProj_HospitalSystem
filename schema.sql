@@ -264,7 +264,7 @@ CREATE TABLE drug_allergy_record (
 );
 
 -- ===== 05_views.sql =====
--- 9 chat-visible views (owner-rights so chat_reader needs no table access); none expose national_id/phone/email/address/birth_date.
+-- 10 chat-visible views (owner-rights so chat_reader needs no table access); none expose national_id/phone/email/address/birth_date.
 -- Owner-rights views bypass the tables' RLS, so each view repeats the access rule itself in its WHERE:
 --   (current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user())  -- SQL editor, service_role, chat RPC without a user
 --   OR is_app_user()                                                         -- linked staff / admin: every row
@@ -282,6 +282,17 @@ JOIN staff s ON s.staff_id = b.staff_id
 LEFT JOIN department d ON d.department_id = s.department_id
 WHERE b.booking_date = CURRENT_DATE AND ((current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user()) OR is_app_user() OR p.patient_id = my_patient_id())
 ORDER BY s.staff_id, b.queue_no;
+
+-- Upcoming appointments from today on, every status ("what appointments do I have?"); one row per patient booking.
+CREATE VIEW v_upcoming_bookings AS
+SELECT b.booking_id, b.booking_date, b.booking_time, b.queue_no, p.hn, p.first_name AS patient_first_name,
+       s.first_name || ' ' || s.last_name AS doctor_name, d.name AS department, b.symptom, b.status
+FROM booking b
+JOIN patient p ON p.patient_id = b.patient_id
+JOIN staff s ON s.staff_id = b.staff_id
+LEFT JOIN department d ON d.department_id = s.department_id
+WHERE b.booking_date >= CURRENT_DATE AND ((current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user()) OR is_app_user() OR p.patient_id = my_patient_id())
+ORDER BY b.booking_date, b.booking_time, s.staff_id;
 
 CREATE VIEW v_doctor_workload AS
 SELECT s.staff_id, s.first_name || ' ' || s.last_name AS doctor_name, d.name AS department,
@@ -485,13 +496,13 @@ ALTER TABLE chat_logs ENABLE ROW LEVEL SECURITY;
 CREATE POLICY own_chat_logs_select ON chat_logs FOR SELECT TO authenticated USING (user_id = auth.uid());
 CREATE POLICY own_chat_logs_insert ON chat_logs FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid());
 
--- Read-only role used only inside run_readonly_query(): the 9 views, no base tables.
+-- Read-only role used only inside run_readonly_query(): the 10 views, no base tables.
 DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'chat_reader') THEN CREATE ROLE chat_reader NOLOGIN; END IF;
 END $$;
 GRANT USAGE ON SCHEMA public TO chat_reader;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM chat_reader;
-GRANT SELECT ON v_booking_queue_today, v_doctor_workload, v_feedback_summary, v_bed_occupancy, v_visit_billing,
+GRANT SELECT ON v_booking_queue_today, v_upcoming_bookings, v_doctor_workload, v_feedback_summary, v_bed_occupancy, v_visit_billing,
                 v_top_diagnosis, v_pharmacist_screening_queue, v_inventory_stock_status, v_drug_cost_summary TO chat_reader;
 -- the views' access check calls these; Postgres checks EXECUTE for the caller (chat_reader inside the RPC)
 GRANT EXECUTE ON FUNCTION is_app_user(), my_patient_id(), no_signed_in_user() TO chat_reader;
@@ -499,7 +510,7 @@ GRANT EXECUTE ON FUNCTION is_app_user(), my_patient_id(), no_signed_in_user() TO
 -- NOTE: statement_timeout cannot be (re)armed from inside a function, so long-running queries are prevented by
 -- sqlGuard (no functions such as pg_sleep, forced LIMIT 100) and, optionally, a role-level timeout set once by an admin:
 --   ALTER ROLE service_role SET statement_timeout = '10s';   -- PostgREST applies per-role settings per request
--- SECURITY DEFINER and OWNED BY chat_reader: the query runs with chat_reader's privileges (9 views only) and, because
+-- SECURITY DEFINER and OWNED BY chat_reader: the query runs with chat_reader's privileges (10 views only) and, because
 -- Postgres forbids changing "role" inside a security-definer function, it cannot switch itself to service_role.
 -- RETURNS json (not jsonb): jsonb re-sorts object keys by length, so the chat table's columns came back in a different
 -- order from the SELECT; json keeps them as written.

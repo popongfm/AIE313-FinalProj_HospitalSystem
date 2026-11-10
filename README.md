@@ -1,6 +1,6 @@
 # ระบบสารสนเทศโรงพยาบาล AIE313 + AI Chat
 
-Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS แบบ static (Docker image บน Render) · AI Chat (MCP เป็นค่าเริ่มต้น, Text-to-SQL เป็นตัวสำรอง) ที่อ่านได้เฉพาะ 9 views แบบอ่านอย่างเดียว
+Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS แบบ static (Docker image บน Render) · AI Chat (MCP เป็นค่าเริ่มต้น, Text-to-SQL เป็นตัวสำรอง) ที่อ่านได้เฉพาะ 10 views แบบอ่านอย่างเดียว
 งานที่เหลือของแต่ละคน: `docs/TEAM_HANDOFF.md` · แผนงาน: `docs/superpowers/plans/` · ER diagram: `docs/er/` · กรณีทดสอบ: `docs/test-cases.md` · query วิเคราะห์: `analysis/analysis_queries.sql`
 
 ## ขั้นตอน deploy
@@ -8,7 +8,7 @@ Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS �
 Image ไม่มี key อยู่ข้างใน เพราะ `config.js` ถูกสร้างตอน container เริ่มทำงานจาก env ที่ตั้งใน Render จึงเปิด repo บน Docker Hub เป็น public ได้
 
 ### 1. Supabase
-1. สร้างโปรเจกต์ → SQL editor: รัน `schema.sql` แล้วตามด้วย `seed.sql` (22 ตาราง, 9 views, RLS, role `chat_reader`, ฟังก์ชัน `run_readonly_query`)
+1. สร้างโปรเจกต์ → SQL editor: รัน `schema.sql` แล้วตามด้วย `seed.sql` (22 ตาราง, 10 views, RLS, role `chat_reader`, ฟังก์ชัน `run_readonly_query`)
    `schema.sql` รันได้ครั้งเดียวบนโปรเจกต์ที่ว่าง ถ้าเคยรันไปแล้ว (เช่นเจอ `already exists`) ให้สร้างโปรเจกต์ใหม่ หรือล้าง schema `public` ด้วยคำสั่งนี้ก่อน **ข้อมูลทุกตารางใน `public` จะหายรวมถึง `profiles`** (บัญชีใน Auth ยังอยู่ แต่ต้องผูก profile ใหม่) บรรทัด `ALTER DEFAULT PRIVILEGES` คืนสิทธิ์ตั้งต้นของ Supabase ถ้าไม่ใส่ `service_role` จะอ่าน `profiles` ไม่ได้และ chat จะตอบ 403 กับทุกบัญชี:
    ```sql
    DROP SCHEMA IF EXISTS public CASCADE;
@@ -20,7 +20,7 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
    ```
 2. SQL editor: `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
-   **อัปเดตโปรเจกต์ที่ลง schema ไปแล้ว:** รันไฟล์ใน `db/migrations/` ที่ยังไม่เคยรันตามลำดับวันที่ (แต่ละไฟล์เป็น transaction เดียว) **ก่อน** deploy Edge Function เวอร์ชันเดียวกัน เช่น `2026-11-10_patient_portal.sql` (สิทธิ์บัญชีผู้ป่วย) โปรเจกต์ใหม่ใช้แค่ `schema.sql` + `seed.sql`
+   **อัปเดตโปรเจกต์ที่ลง schema ไปแล้ว:** รันไฟล์ใน `db/migrations/` ที่ยังไม่เคยรันตามลำดับวันที่ (แต่ละไฟล์เป็น transaction เดียว) **ก่อน** deploy Edge Function เวอร์ชันเดียวกัน เช่น `2026-11-10_patient_portal.sql` (สิทธิ์บัญชีผู้ป่วย) แล้วตามด้วย `2026-11-10b_upcoming_bookings.sql` (view นัดหมายตั้งแต่วันนี้) โปรเจกต์ใหม่ใช้แค่ `schema.sql` + `seed.sql`
 3. **Auth** (หน้าเว็บมีปุ่มสมัครสมาชิกตามที่โจทย์กำหนด):
    - Authentication → Sign In / Providers: **เปิด "Allow new users to sign up"** ไว้
    - **"Confirm email"**: สำหรับ demo ให้ปิดไว้ เพราะ SMTP เริ่มต้นของ Supabase ส่งอีเมลยืนยันได้เฉพาะอีเมลของสมาชิกในโปรเจกต์ ถ้าจะเปิดไว้ต้องตั้ง SMTP เอง
@@ -34,7 +34,7 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
      | บัญชี | ตาราง (CRUD) | รายงาน / Dashboard / Chat |
      |---|---|---|
      | ไม่มี profile | ไม่เห็นอะไร | ไม่เห็นอะไร / chat ตอบ 403 |
-     | `patient` | เห็นเฉพาะของตัวเองใน `patient`, `booking`, `visit`, `prescription`; จองคิว (ระบบใส่เลขคิวให้) และยกเลิกคิวของตัวเอง; แก้ได้เฉพาะเบอร์โทร อีเมล ที่อยู่ | view รายคน (คิววันนี้ ค่ารักษา ใบสั่งยา) เฉพาะของตัวเอง, view ภาพรวมเห็นทั้งหมด; chat ตอบจากข้อมูลชุดเดียวกันนี้ |
+     | `patient` | เห็นเฉพาะของตัวเองใน `patient`, `booking`, `visit`, `prescription`; จองคิว (ระบบใส่เลขคิวให้) และยกเลิกคิวของตัวเอง; แก้ได้เฉพาะเบอร์โทร อีเมล ที่อยู่ | view รายคน (คิววันนี้ นัดหมาย ค่ารักษา ใบสั่งยา) เฉพาะของตัวเอง, view ภาพรวมเห็นทั้งหมด; chat ตอบจากข้อมูลชุดเดียวกันนี้ |
      | `admin`, `doctor`, `pharmacist`, `nurse` | ทุกตาราง | ทุกแถว |
 4. **Edge Functions** (ต้องมี Supabase CLI: `brew install supabase/tap/supabase` แล้ว `supabase login`) รันในโฟลเดอร์ repo
    chat หลักคือ **MCP (วิธี C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, วิธี B) เป็นตัวสำรอง:

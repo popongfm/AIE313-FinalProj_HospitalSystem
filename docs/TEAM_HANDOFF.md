@@ -5,7 +5,7 @@
 ## แบ่งส่วนฐานข้อมูล
 | สมาชิก | ตารางที่รับผิดชอบ | ER ของตน | Views ของตน |
 |---|---|---|---|
-| A — Booking | booking, feedback | `docs/er/er_member_A_booking.png` | v_booking_queue_today, v_doctor_workload, v_feedback_summary |
+| A — Booking | booking, feedback | `docs/er/er_member_A_booking.png` | v_booking_queue_today, v_upcoming_bookings, v_doctor_workload, v_feedback_summary |
 | B — Pharmacy | drug, drug_lot, prescription, prescription_item, dispense_record, inventory, drug_allergy_record | `docs/er/er_member_B_pharmacy.png` | v_pharmacist_screening_queue, v_inventory_stock_status, v_drug_cost_summary |
 | C — Records | room, bed, visit, admission, diagnosis, lab_result, insurance_coverage, daily_charge | `docs/er/er_member_C_records.png` | v_bed_occupancy, v_visit_billing, v_top_diagnosis |
 | ใช้ร่วมกัน | department, staff, patient, profiles, chat_logs | `docs/er/er_core_shared.png` | — |

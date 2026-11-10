@@ -21,7 +21,7 @@ END $$;
 -- ...including through the owner-rights views (they bypass table RLS, so they check is_app_user() themselves)
 DO $$
 DECLARE v text; n bigint;
-  names text[] := ARRAY['v_booking_queue_today','v_doctor_workload','v_feedback_summary','v_bed_occupancy','v_visit_billing',
+  names text[] := ARRAY['v_booking_queue_today','v_upcoming_bookings','v_doctor_workload','v_feedback_summary','v_bed_occupancy','v_visit_billing',
                         'v_top_diagnosis','v_pharmacist_screening_queue','v_inventory_stock_status','v_drug_cost_summary'];
 BEGIN
   FOREACH v IN ARRAY names LOOP
@@ -58,7 +58,7 @@ BEGIN
     ASSERT n = 0, 'patient must not read ' || v || ', got ' || n;
   END LOOP;
   -- per-patient views: only its own rows, and not empty
-  FOREACH v IN ARRAY ARRAY['v_booking_queue_today','v_visit_billing','v_pharmacist_screening_queue'] LOOP
+  FOREACH v IN ARRAY ARRAY['v_booking_queue_today','v_upcoming_bookings','v_visit_billing','v_pharmacist_screening_queue'] LOOP
     EXECUTE format('SELECT count(*) FROM %I', v) INTO n;
     ASSERT n > 0, v || ' should show the patient''s own rows';
     EXECUTE format('SELECT count(*) FROM %I WHERE hn IS DISTINCT FROM %L', v, my_hn) INTO n;

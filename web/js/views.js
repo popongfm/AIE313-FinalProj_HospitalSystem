@@ -1,7 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { friendlyError } from './errors.js';
 import { renderTable } from './table.js';
-export const VIEWS = ['v_booking_queue_today', 'v_doctor_workload', 'v_feedback_summary', 'v_bed_occupancy', 'v_visit_billing',
+export const VIEWS = ['v_booking_queue_today', 'v_upcoming_bookings', 'v_doctor_workload', 'v_feedback_summary', 'v_bed_occupancy', 'v_visit_billing',
   'v_top_diagnosis', 'v_pharmacist_screening_queue', 'v_inventory_stock_status', 'v_drug_cost_summary'];
 
 export async function mountViewsPage(el) {
