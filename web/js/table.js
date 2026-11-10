@@ -5,6 +5,7 @@ export function renderTable(rows, extraHeader = null, extraCell = null) {
   if (!m) { wrap.className = 'empty'; wrap.textContent = 'ไม่พบข้อมูล'; return wrap; }
   wrap.className = 'tablewrap';
   const table = document.createElement('table');
+  if (extraHeader) table.className = 'has-actions';   // keeps the edit/delete column in view (css/app.css)
   const head = table.createTHead().insertRow();
   m.columns.forEach((c) => { const th = document.createElement('th'); th.textContent = c; head.appendChild(th); });
   if (extraHeader) { const th = document.createElement('th'); th.textContent = extraHeader; head.appendChild(th); }

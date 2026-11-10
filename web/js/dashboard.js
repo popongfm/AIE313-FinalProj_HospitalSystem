@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient.js';
 import { friendlyError } from './errors.js';
 import { pivot, sumBy } from './helpers.js';
 
-const PALETTE = ['#0a7d6b', '#e08a1e', '#3b6fd4', '#b8479b', '#7a8b99', '#c0392b'];
+const PALETTE = ['#0f6b5e', '#9a5d0c', '#2f5d9e', '#74467f', '#6c7a86', '#b4232f'];   // same zone colours as css/app.css
 function loadChartJs() {
   if (window.Chart) return Promise.resolve();
   return new Promise((ok, fail) => {
@@ -38,7 +38,7 @@ export async function mountDashboard(el) {
   const d2 = card(grid, 'D2 ค่ารักษารายเดือน แยกตามแผนก (บาท)');
   const r2 = await supabase.from('v_visit_billing').select('department,month,total_amount');
   if (r2.error) msg.textContent = friendlyError(r2.error);
-  const p2 = pivot(sumBy(r2.data || [], ['department', 'month'], 'total_amount'), 'month', 'department', 'total');
+  const p2 = pivot(sumBy(r2.data || [], ['department', 'month'], 'total_amount').sort((x, y) => String(x.month).localeCompare(String(y.month))), 'month', 'department', 'total');   // months in calendar order
   draw(d2, { type: 'bar', data: { labels: p2.labels, datasets: datasets(p2, 'bar') } }, (r2.data || []).length > 0);
 
   // D3: drugs below reorder point  (analysis Q19)

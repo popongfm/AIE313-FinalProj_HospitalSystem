@@ -104,6 +104,11 @@ await check('chat: refused dangerous question shows the reason and no table', as
 await check('chat: empty result shows ไม่พบข้อมูล', async () => {
   await page.fill('#q', 'ผลว่างไหม'); await page.click('#send');
   await page.waitForFunction(() => [...document.querySelectorAll('#log .msg.bot')].some((m) => m.textContent.includes('ไม่พบข้อมูล'))); });
+await check('app.html#chat opens the Chat tab; an unknown hash like #constructor falls back to the data tab', async () => {
+  await page.goto('about:blank'); await page.goto(base + '/app.html#chat');
+  await page.waitForFunction(() => document.getElementById('page-title').textContent === 'ผู้ช่วย AI');
+  await page.goto('about:blank'); await page.goto(base + '/app.html#constructor');
+  await page.waitForSelector('#panel table'); assert.equal(await page.textContent('#page-title'), 'ข้อมูลในระบบ'); });
 await check('account without an approved profile sees the pending notice', async () => {
   await page.click('#logout'); await page.waitForURL('**/index.html');
   await page.fill('#email', 'new@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html');
