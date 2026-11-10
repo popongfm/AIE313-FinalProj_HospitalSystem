@@ -214,6 +214,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+      - name: Make the build context owner-only, like a checkout on macOS (the image must still work)
+        run: chmod -R go-rwx scripts web
       - name: Build the image (linux/amd64, the platform Render runs)
         uses: docker/build-push-action@v6
         with:
