@@ -20,7 +20,7 @@
 ## งานกลุ่ม (ตกลงว่าใครทำ)
 - [ ] สร้าง Supabase project, รัน `schema.sql` แล้ว `seed.sql`, เปิด sign-up และปิด Confirm email สำหรับ demo, สมัครบัญชีจากหน้าเว็บแล้วเพิ่มแถว `profiles`, ตั้ง `statement_timeout` (ขั้นตอนใน README)
 - [ ] ขอ Groq API key, deploy `chat-mcp`, ตั้ง secret (ห้ามใส่ key ในรีโป)
-- [ ] push GitHub (รัน `bash scripts/check-secrets.sh` ก่อน), เชื่อม Vercel, ตั้ง `SUPABASE_URL` / `SUPABASE_ANON_KEY`
+- [ ] push GitHub (รัน `bash scripts/check-secrets.sh` ก่อน), build image ขึ้น Docker Hub, สร้าง Web Service บน Render จาก image แล้วตั้ง `SUPABASE_URL` / `SUPABASE_ANON_KEY` และใส่ URL ของ Render ใน Supabase Auth (ขั้นตอนใน README)
 - [ ] ทดสอบบนเว็บจริง: Registration, Login, CRUD (ลอง double-booking และลบผู้ป่วยที่มี visit), Views, Dashboard, ถาม Chat ด้วย LLM จริง, บัญชีที่ยังไม่อนุมัติต้องไม่เห็นข้อมูล (S2–S4) แล้วกรอกผลที่ค้างใน `docs/test-cases.md`
 - [ ] ถ่ายภาพหน้าจอระบบจริงใส่รายงาน
 - [ ] รายงาน PDF ตาม Template (TH Sarabun PSK 14pt): ที่มา วัตถุประสงค์ ขอบเขต, Use Case/Activity Diagram, ระบุ LLM+รุ่นที่ใช้ และแผนภาพ Web → Edge Function (MCP) → LLM → Supabase

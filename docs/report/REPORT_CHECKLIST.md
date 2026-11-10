@@ -15,4 +15,4 @@
 | 8 Chat | `supabase/functions/chat-mcp/` (หลัก, MCP วิธี C), `supabase/functions/chat/` (สำรอง, Text-to-SQL วิธี B), `docs/test-cases.md` | ระบุ LLM+รุ่นที่ใช้, วาดแผนภาพสถาปัตยกรรม (Web → Edge Function → LLM → Supabase), ภาพหน้าจอ Chat |
 | 10 Testing | `docs/test-cases.md` | รันกรณี *todo* บนระบบจริง (รวมถามด้วย LLM จริง) |
 | 12 นำเสนอรายบุคคล | `docs/er/er_member_*.png` | คนละ ~5 นาที: ER, schema, normalization, views, SQL 1 ตัวอย่าง |
-| ส่งงาน | `schema.sql`, `seed.sql`, `analysis_queries.sql`, zip dataset, ลิงก์ Vercel/GitHub, วิดีโอ ≤ 5 นาที | รายงาน PDF (TH Sarabun PSK 14pt), สไลด์ PDF รวมไฟล์เดียว, วิดีโอ |
+| ส่งงาน | `schema.sql`, `seed.sql`, `analysis_queries.sql`, zip dataset, ลิงก์เว็บบน Render, ลิงก์ GitHub (และ Docker Hub), วิดีโอ ≤ 5 นาที | รายงาน PDF (TH Sarabun PSK 14pt), สไลด์ PDF รวมไฟล์เดียว, วิดีโอ |

@@ -1,0 +1,13 @@
+# Only scripts/write-config.mjs, scripts/serve.mjs and web/ go into the image (see Dockerfile).
+.git
+.github
+**/.DS_Store
+.env*
+supabase
+db
+docs
+analysis
+*.sql
+web/config.js
+web/tests
+web/node_modules

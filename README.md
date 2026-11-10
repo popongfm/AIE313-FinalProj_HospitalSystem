@@ -1,28 +1,58 @@
 # ระบบสารสนเทศโรงพยาบาล AIE313 + AI Chat
 
-Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS แบบ static (Vercel) · AI Chat (MCP เป็นค่าเริ่มต้น, Text-to-SQL เป็นตัวสำรอง) ที่อ่านได้เฉพาะ 9 views แบบอ่านอย่างเดียว
+Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS แบบ static (Docker image บน Render) · AI Chat (MCP เป็นค่าเริ่มต้น, Text-to-SQL เป็นตัวสำรอง) ที่อ่านได้เฉพาะ 9 views แบบอ่านอย่างเดียว
 งานที่เหลือของแต่ละคน: `docs/TEAM_HANDOFF.md` · แผนงาน: `docs/superpowers/plans/` · ER diagram: `docs/er/` · กรณีทดสอบ: `docs/test-cases.md` · query วิเคราะห์: `analysis/analysis_queries.sql`
 
-## ขั้นตอน deploy (ทำครั้งเดียว)
-1. **โปรเจกต์ Supabase** → SQL editor: รัน `schema.sql` แล้วตามด้วย `seed.sql` (22 ตาราง, 9 views, RLS, role `chat_reader`, ฟังก์ชัน `run_readonly_query`)
+## ขั้นตอน deploy
+ลำดับ: **Supabase** (ฐานข้อมูล, Auth, Edge Function) → **Docker Hub** (image ของเว็บ) → **Render** (รันเว็บจาก image)
+Image ไม่มี key อยู่ข้างใน เพราะ `config.js` ถูกสร้างตอน container เริ่มทำงานจาก env ที่ตั้งใน Render จึงเปิด repo บน Docker Hub เป็น public ได้
+
+### 1. Supabase
+1. สร้างโปรเจกต์ → SQL editor: รัน `schema.sql` แล้วตามด้วย `seed.sql` (22 ตาราง, 9 views, RLS, role `chat_reader`, ฟังก์ชัน `run_readonly_query`)
    ถ้าเคยรัน `schema.sql` เวอร์ชันเก่าไปแล้ว (ที่ล้มตรง `ALTER FUNCTION ... OWNER TO chat_reader` หรือทำให้ `run_readonly_query` ยังเป็นของ `postgres`) ให้เริ่มจากโปรเจกต์ใหม่ หรือรันคำสั่งนี้ก่อน: `DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres, anon, authenticated, service_role;`
-2. **Auth** (หน้าเว็บมีปุ่มสมัครสมาชิกตามที่โจทย์กำหนด):
+2. SQL editor: `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
+3. **Auth** (หน้าเว็บมีปุ่มสมัครสมาชิกตามที่โจทย์กำหนด):
    - Authentication → Sign In / Providers: **เปิด "Allow new users to sign up"** ไว้
-   - **"Confirm email"**: สำหรับ demo ให้ปิดไว้ เพราะ SMTP เริ่มต้นของ Supabase ส่งอีเมลยืนยันได้เฉพาะอีเมลของสมาชิกในโปรเจกต์ ถ้าจะเปิดไว้ต้องตั้ง SMTP เอง และใส่ URL ของ Vercel ใน Authentication → URL Configuration (Site URL / Redirect URLs) ลิงก์ยืนยันจึงจะพากลับมาที่เว็บ
-   - บัญชีที่สมัครใหม่ **ยังไม่เห็นข้อมูล** (RLS, view และ chat เช็คสิทธิ์ทั้งหมด) จนกว่า admin จะผูกบัญชีกับ profile ที่ไม่ใช่ patient ใน SQL editor ดู uuid ได้ที่ Authentication → Users:
+   - **"Confirm email"**: สำหรับ demo ให้ปิดไว้ เพราะ SMTP เริ่มต้นของ Supabase ส่งอีเมลยืนยันได้เฉพาะอีเมลของสมาชิกในโปรเจกต์ ถ้าจะเปิดไว้ต้องตั้ง SMTP เอง
+   - หลังได้ URL จาก Render (ขั้นที่ 3) ให้ใส่ใน Authentication → URL Configuration: **Site URL** และ **Redirect URLs** = `https://<ชื่อ service>.onrender.com`
+   - บัญชีที่สมัครใหม่ **ยังไม่เห็นข้อมูล** (RLS, view และ chat เช็คสิทธิ์ทั้งหมด) จนกว่า admin จะผูกบัญชีกับ profile ที่ไม่ใช่ patient ใน SQL editor (ดู uuid ได้ที่ Authentication → Users):
      `INSERT INTO profiles(user_id, role) VALUES ('<auth user uuid>', 'admin');`
      `INSERT INTO profiles(user_id, role, staff_id) VALUES ('<auth user uuid>', 'doctor', <staff_id>);` (หรือ `pharmacist` / `nurse`)
-   - **ต้องทำ:** `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
-3. **Edge Functions** (ต้องมี Supabase CLI) chat หลักคือ **MCP (Method C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, Method B) เก็บไว้เป็นทางเลือก (ตั้ง `CHAT_FUNCTION=chat` ใน Vercel ถ้าจะใช้):
-   `supabase functions deploy chat-mcp --project-ref <ref>` (และ `chat` ถ้าต้องการ) แล้วตามด้วย
+4. **Edge Functions** (ต้องมี Supabase CLI: `brew install supabase/tap/supabase` แล้ว `supabase login`) รันในโฟลเดอร์ repo
+   chat หลักคือ **MCP (วิธี C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, วิธี B) เป็นตัวสำรอง:
+   `supabase functions deploy chat-mcp --project-ref <ref>` (และ `chat` ถ้าต้องการ)
    `supabase secrets set GROQ_API_KEY=<key> LLM_MODEL=llama-3.3-70b-versatile --project-ref <ref>`
-   (Supabase ใส่ `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY` ให้อัตโนมัติ) ตรวจชื่อโมเดลว่ายังใช้ได้ที่ https://console.groq.com/docs/models
-4. **Vercel**: import repo จาก GitHub แล้วตั้ง env `SUPABASE_URL` และ `SUPABASE_ANON_KEY` (ใช้เฉพาะ key แบบ *anon/publishable*) `vercel.json` จะรัน `scripts/write-config.mjs` ซึ่งไม่ยอมรับ key แบบ service_role
-5. รันกรณีทดสอบที่ติดว่า *todo* ใน `docs/test-cases.md` ซ้ำบน URL ที่ deploy แล้ว (ถามคำถาม chat ชุดเดิมกับ LLM จริง)
+   (`<ref>` คือรหัสโปรเจกต์ใน URL ของ Dashboard; Supabase ใส่ `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY` ให้ function อัตโนมัติ) ตรวจชื่อโมเดลว่ายังใช้ได้ที่ https://console.groq.com/docs/models
+5. จด **Project URL** และ **anon / publishable key** จาก Project Settings → API ไว้ใช้ใน Render (ห้ามใช้ `service_role` / `sb_secret_` key — server จะไม่ยอมเริ่มทำงาน)
+
+### 2. Docker Hub (image ของเว็บ)
+Render รันบนเครื่อง x86 ดังนั้น image ต้องเป็น `linux/amd64` แม้จะ build บน Mac ชิป Apple (M1/M2/…) เลือกทางใดทางหนึ่ง:
+- **Build บน Mac** (ต้องมี Docker Desktop) ในโฟลเดอร์ repo:
+  ```bash
+  docker login
+  docker buildx build --platform linux/amd64 -t <dockerhub-user>/aie313-hospital-web:latest --push .
+  ```
+- **ให้ GitHub Actions build ให้** (`.github/workflows/docker-publish.yml`): ใน GitHub repo → Settings → Secrets and variables → Actions เพิ่ม `DOCKERHUB_USERNAME` และ `DOCKERHUB_TOKEN` (Docker Hub → Account settings → Personal access tokens, สิทธิ์ Read & Write) แล้วกด Actions → docker-publish → Run workflow หลังจากนั้นจะ build ใหม่เองทุกครั้งที่ push การแก้ใน `web/` ถ้าใส่ `RENDER_DEPLOY_HOOK_URL` ด้วย Render จะ deploy ใหม่ให้อัตโนมัติ
+
+ลองรันในเครื่องก่อนได้: `docker run --rm -p 8080:10000 -e SUPABASE_URL=<url> -e SUPABASE_ANON_KEY=<anon key> <dockerhub-user>/aie313-hospital-web:latest` แล้วเปิด http://localhost:8080
+
+### 3. Render (web hosting)
+1. Render Dashboard → **+ New → Web Service** → Source Code: **Existing Image** → Image URL: `docker.io/<dockerhub-user>/aie313-hospital-web:latest` → **Connect**
+2. ตั้งชื่อ (จะเป็น URL `https://<ชื่อ>.onrender.com`), region **Singapore**, plan **Free**
+3. Environment Variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY` (และ `CHAT_FUNCTION=chat` ถ้าจะใช้ Text-to-SQL แทน MCP)
+4. Advanced → **Health Check Path**: `/healthz` → **Deploy**
+5. กลับไปใส่ URL ของ Render ใน Supabase (ขั้น 1.3)
+- push image ใหม่แล้ว Render **ไม่ deploy เอง**: กด Manual Deploy → **Deploy latest reference** หรือใช้ Deploy Hook (Settings → Deploy Hook) กับ GitHub Actions ด้านบน
+- Plan Free จะหลับเมื่อไม่มีคนใช้ 15 นาที เปิดครั้งแรกรอประมาณ 1 นาที ควรเปิดเว็บทิ้งไว้ก่อนอัดวิดีโอหรือนำเสนอ
+
+### 4. ทดสอบบนระบบจริง
+รันกรณีทดสอบที่ติดว่า *todo* ใน `docs/test-cases.md` บน URL ของ Render (สมัครสมาชิก, บัญชีที่ยังไม่อนุมัติ S2–S4, ถามคำถาม chat ชุดเดิมกับ LLM จริง)
+
+ทางเลือก: `vercel.json` ยังใช้ deploy บน Vercel ได้ (import repo แล้วตั้ง env 2 ตัวเดียวกัน)
 
 ## พัฒนาและทดสอบในเครื่อง
 - ห้าม commit key: `bash scripts/check-secrets.sh`
-- เว็บ: คัดลอก `web/config.example.js` → `web/config.js` (git ไม่เก็บไฟล์นี้) แล้วรัน `python3 -m http.server -d web 8080`
+- เว็บ: คัดลอก `web/config.example.js` → `web/config.js` (git ไม่เก็บไฟล์นี้) แล้วรัน `python3 -m http.server -d web 8080` หรือรันแบบเดียวกับใน container: `SUPABASE_URL=… SUPABASE_ANON_KEY=… PORT=8080 node scripts/serve.mjs`
 - ทดสอบ SQL (Postgres ≥15 ในเครื่องหรือ docker): `PGHOST=… PGPORT=… PGUSER=… bash db/tests/run_tests.sh`
 - สร้างไฟล์ส่งงาน: `bash db/build_schema.sh` → `schema.sql`, `seed.sql` · สร้าง seed ใหม่: `python3 db/seed/generate_seed.py --seed 313 > db/seed/seed.sql`
 - Unit test ของเว็บ: `node --test web/tests/*.test.mjs scripts/*.test.mjs` · smoke test บน browser (mock Supabase): `PLAYWRIGHT_PATH=<playwright> node web/tests/smoke.mjs`
@@ -33,5 +63,6 @@ Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS �
 ## ตัวแปร environment
 | ที่ใช้ | ชื่อ | หมายเหตุ |
 |---|---|---|
-| เว็บ (เปิดเผยได้) | `SUPABASE_URL`, `SUPABASE_ANON_KEY` | อยู่ใน `web/config.js` ซึ่ง git ไม่เก็บ |
+| เว็บ (เปิดเผยได้) | `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `CHAT_FUNCTION` (ไม่บังคับ) | ตั้งใน Render; ในเครื่องอยู่ใน `web/config.js` ซึ่ง git ไม่เก็บ |
+| GitHub Actions secret | `DOCKERHUB_USERNAME`, `DOCKERHUB_TOKEN`, `RENDER_DEPLOY_HOOK_URL` (ไม่บังคับ) | ใช้ push image และสั่ง Render deploy |
 | Secret ของ Edge Function | `GROQ_API_KEY`, `LLM_MODEL` (ไม่บังคับ), `LLM_BASE_URL` (ไม่บังคับ) | ห้ามอยู่ใน git หรือ browser |

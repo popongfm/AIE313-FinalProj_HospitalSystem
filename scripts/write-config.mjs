@@ -1,4 +1,5 @@
-// Vercel build step: writes web/config.js from environment variables. Refuses secret keys.
+// Builds web/config.js from environment variables and refuses secret keys. Used by scripts/serve.mjs at container start
+// (Docker / Render) and, when run directly, as the Vercel build step.
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
