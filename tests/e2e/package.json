@@ -1,0 +1,8 @@
+{
+  "name": "aie313-e2e",
+  "private": true,
+  "type": "module",
+  "description": "End-to-end tests against a local Supabase stack (see .github/workflows/ci.yml)",
+  "scripts": { "test": "node supabase.e2e.mjs" },
+  "dependencies": { "@supabase/supabase-js": "2.45.4" }
+}
