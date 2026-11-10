@@ -20,9 +20,10 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const { data: auth } = await admin.auth.getUser(token);
   if (!auth?.user) return json({ error: 'กรุณาเข้าสู่ระบบก่อนใช้งาน' }, 401);
-  // Signed in is not enough: only accounts an admin linked to a staff/admin profile may query (same rule as is_app_user()).
+  // Signed in is not enough: the account must be linked to a profile by an admin. Staff/admin see every row; a patient
+  // sees only its own rows, because run_readonly_query applies the views' access rule for the user passed as as_user.
   const { data: prof } = await admin.from('profiles').select('role').eq('user_id', auth.user.id).maybeSingle();
-  if (!prof || prof.role === 'patient') return json({ error: 'บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, 403);
+  if (!prof) return json({ error: 'บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, 403);
 
   let question = '';
   try { question = (await req.json()).question; } catch { /* handled as empty question */ }
@@ -30,7 +31,7 @@ Deno.serve(async (req) => {
   const result = await handleMcpChat({
     llm: makeLlm(),
     runQuery: async (sql) => {
-      const { data, error } = await admin.rpc('run_readonly_query', { q: sql });
+      const { data, error } = await admin.rpc('run_readonly_query', { q: sql, as_user: auth.user.id });
       if (error) throw new Error(error.message);
       return data as Record<string, unknown>[];
     },

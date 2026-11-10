@@ -27,7 +27,12 @@ export function signUpResult(data, error) {
   return { ok: true, message: data && data.session ? SIGNUP_PENDING_APPROVAL : SIGNUP_CONFIRM_EMAIL, hasSession: !!(data && data.session) };
 }
 
-// A signed-in account may use the app only when an admin linked it to a non-patient profile (same rule as is_app_user()).
-export function hasAppAccess(profile) {
-  return !!profile && profile.role !== 'patient';
+// What a signed-in account may do, from its row in profiles (the database enforces the same rules with RLS):
+//   no profile        -> nothing yet (waiting for an admin)
+//   role 'patient'    -> its own records only (patient portal)
+//   any other role    -> staff: everything
+export function accessFromProfile(profile) {
+  if (!profile) return { linked: false, role: null, patient: false };
+  return { linked: true, role: profile.role, patient: profile.role === 'patient' };
 }
+export function hasAppAccess(profile) { return accessFromProfile(profile).linked; }

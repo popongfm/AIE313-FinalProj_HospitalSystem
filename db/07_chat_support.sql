@@ -23,8 +23,8 @@ GRANT USAGE ON SCHEMA public TO chat_reader;
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM chat_reader;
 GRANT SELECT ON v_booking_queue_today, v_doctor_workload, v_feedback_summary, v_bed_occupancy, v_visit_billing,
                 v_top_diagnosis, v_pharmacist_screening_queue, v_inventory_stock_status, v_drug_cost_summary TO chat_reader;
--- the views' access check calls is_app_user(); Postgres checks EXECUTE even when current_user = chat_reader short-circuits it
-GRANT EXECUTE ON FUNCTION is_app_user() TO chat_reader;
+-- the views' access check calls these; Postgres checks EXECUTE for the caller (chat_reader inside the RPC)
+GRANT EXECUTE ON FUNCTION is_app_user(), my_patient_id(), no_signed_in_user() TO chat_reader;
 
 -- NOTE: statement_timeout cannot be (re)armed from inside a function, so long-running queries are prevented by
 -- sqlGuard (no functions such as pg_sleep, forced LIMIT 100) and, optionally, a role-level timeout set once by an admin:
@@ -33,18 +33,23 @@ GRANT EXECUTE ON FUNCTION is_app_user() TO chat_reader;
 -- Postgres forbids changing "role" inside a security-definer function, it cannot switch itself to service_role.
 -- RETURNS json (not jsonb): jsonb re-sorts object keys by length, so the chat table's columns came back in a different
 -- order from the SELECT; json keeps them as written.
-CREATE FUNCTION run_readonly_query(q text) RETURNS json
+-- as_user: the signed-in user who asked (the Edge Function passes it after checking the token). It becomes auth.uid() for
+-- this transaction, so the views' access rule applies to chat answers too (a patient sees only its own rows).
+-- Only service_role may call this function; LLM SQL cannot call set_config (sqlGuard allow-list, MCP builds the SQL).
+CREATE FUNCTION run_readonly_query(q text, as_user uuid DEFAULT NULL) RETURNS json
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
-DECLARE result json;
+DECLARE result json; caller text := current_setting('request.jwt.claim.sub', true);
 BEGIN
+  PERFORM set_config('request.jwt.claim.sub', coalesce(as_user::text, ''), true);   -- only for this query
   EXECUTE format('SELECT coalesce(json_agg(t), ''[]''::json) FROM (%s) t', q) INTO result;
+  PERFORM set_config('request.jwt.claim.sub', coalesce(caller, ''), true);
   RETURN result;
 END $$;
 -- On Supabase "postgres" is not a superuser: giving the function to chat_reader requires being able to SET ROLE to it and
 -- chat_reader holding CREATE on the schema. Grant both just for the ALTER, then take CREATE back.
 GRANT chat_reader TO CURRENT_USER;
 GRANT CREATE ON SCHEMA public TO chat_reader;
-ALTER FUNCTION run_readonly_query(text) OWNER TO chat_reader;
+ALTER FUNCTION run_readonly_query(text, uuid) OWNER TO chat_reader;
 REVOKE CREATE ON SCHEMA public FROM chat_reader;
-REVOKE ALL ON FUNCTION run_readonly_query(text) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION run_readonly_query(text) TO service_role;
+REVOKE ALL ON FUNCTION run_readonly_query(text, uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION run_readonly_query(text, uuid) TO service_role;

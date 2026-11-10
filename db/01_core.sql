@@ -50,3 +50,17 @@ CREATE FUNCTION is_app_user() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFIN
 $$ SELECT EXISTS (SELECT 1 FROM profiles WHERE user_id = auth.uid() AND role <> 'patient') $$;
 REVOKE ALL ON FUNCTION is_app_user() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION is_app_user() TO authenticated, service_role;
+
+-- Patient accounts: the patient this user was linked to by an admin (NULL for staff, admins and unlinked accounts).
+-- Patients see and change only their own rows (policies and guards in 06_rls.sql).
+CREATE FUNCTION my_patient_id() RETURNS int LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
+$$ SELECT patient_id FROM profiles WHERE user_id = auth.uid() AND role = 'patient' $$;
+REVOKE ALL ON FUNCTION my_patient_id() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION my_patient_id() TO authenticated, service_role;
+
+-- TRUE when no signed-in user is attached to the request: the SQL editor, the service_role key, or the chat RPC called
+-- without a user. Security definer so roles without USAGE on schema auth (chat_reader) can call it inside the views.
+CREATE FUNCTION no_signed_in_user() RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS
+$$ SELECT auth.uid() IS NULL $$;
+REVOKE ALL ON FUNCTION no_signed_in_user() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION no_signed_in_user() TO authenticated, service_role;

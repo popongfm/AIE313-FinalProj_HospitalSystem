@@ -21,9 +21,15 @@ Status legend: **mock** = verified automatically against a mocked Supabase clien
 | V1 | Open each of the 9 views | Table (or "ไม่พบข้อมูล" when empty) | v_top_diagnosis / v_feedback_summary checked | mock PASS (2/9) |
 | D1 | Open Dashboard | 3 charts (D1 bookings, D2 billing, D3 low stock) | 3 charts drawn | mock PASS |
 | S1 | Call `/rest/v1/patient` with the anon key, no session | HTTP 401 / permission denied, no rows | RLS tested in `db/tests/70_rls.sql` | DB PASS, HTTP todo |
-| S2 | Signed in as an unapproved account (no profile, or role `patient`), open each of the 9 views | Every view returns 0 rows (no HN, names or allergies) | 0 rows in all 9 views (`db/tests/70_rls.sql`) | DB PASS, HTTP todo |
+| S2 | Signed in as an unapproved account (no profile), open each of the 9 views | Every view returns 0 rows (no HN, names or allergies) | 0 rows in all 9 views (`db/tests/70_rls.sql`) | DB PASS, HTTP todo |
 | S3 | Signed in as an unapproved account, ask any Chat question | HTTP 403, message "บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ" | | todo |
 | S4 | Admin links the account (`INSERT INTO profiles ...`), user reloads | Notice disappears; tables, views and Chat work | | todo |
+| P1 | Patient account (`role = 'patient'`): open "ข้อมูล" | Title "ข้อมูลของฉัน"; only 4 tables (patient, booking, visit, prescription), each showing only the patient's own rows | Own rows only (`db/tests/70_rls.sql`, e2e A) | mock PASS, DB PASS, todo |
+| P2 | Patient: "+ จองคิว", choose a doctor, date, time | Booking created with the next queue number, status pending; a past date is refused | | mock PASS, DB PASS, todo |
+| P3 | Patient: "ยกเลิกคิว" on a pending booking | Status becomes cancelled; changing time or deleting is refused | | DB PASS, todo |
+| P4 | Patient: edit own phone / email / address; try to change name or allergy note | Contact details saved; other fields refused ("ไม่มีสิทธิ์ใช้งาน") | | DB PASS, todo |
+| P5 | Patient: open the 9 views and the Dashboard | Per-patient views (คิววันนี้, ค่ารักษา, ใบสั่งยารอคัดกรอง) show only own rows; summary views show the whole hospital | | DB PASS, todo |
+| P6 | Patient: ask Chat "ผู้ป่วยที่แพ้ยามีใครบ้าง" | Only the patient's own rows (same rule as the views) | | DB PASS, todo |
 
 ## Chat
 

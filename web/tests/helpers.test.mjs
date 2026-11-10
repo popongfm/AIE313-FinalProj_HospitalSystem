@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { coerceRow, tableModel, pivot, sumBy } from '../js/helpers.js';
-import { TABLES } from '../js/tables.js';
+import { TABLES, PATIENT_TABLES } from '../js/tables.js';
 
 test('coerceRow trims text, converts numbers, nulls blank optionals', () => {
   const { row, missing } = coerceRow(TABLES.booking, { patient_id: ' 3 ', staff_id: '2', booking_date: '2026-11-20', booking_time: '09:00', queue_no: '4', symptom: '', status: 'pending' });
@@ -34,4 +34,16 @@ test('pivot groups values by label and series, filling zeros', () => {
 test('sumBy totals a value per key combination', () => {
   const rows = [{ k: 'a', m: '1', v: 2 }, { k: 'a', m: '1', v: '3.5' }, { k: 'b', m: '1', v: 1 }];
   assert.deepEqual(sumBy(rows, ['k', 'm'], 'v'), [{ k: 'a', m: '1', total: 5.5 }, { k: 'b', m: '1', total: 1 }]);
+});
+test('patient tables: only the four own-record tables, and only the actions the database allows', () => {
+  assert.deepEqual(Object.keys(PATIENT_TABLES), ['patient', 'booking', 'visit', 'prescription']);
+  assert.deepEqual(PATIENT_TABLES.patient.cols.map((c) => c.name), ['phone', 'email', 'address']);
+  assert.equal(PATIENT_TABLES.patient.insert, false); assert.equal(PATIENT_TABLES.patient.remove, false);
+  assert.equal(PATIENT_TABLES.booking.edit, false); assert.equal(PATIENT_TABLES.booking.remove, false); assert.equal(PATIENT_TABLES.booking.cancel, true);
+  assert.ok(!PATIENT_TABLES.booking.cols.some((c) => ['patient_id', 'queue_no', 'status', 'visit_id'].includes(c.name)), 'set by the database');
+  assert.equal(PATIENT_TABLES.visit.readOnly, true); assert.equal(PATIENT_TABLES.prescription.readOnly, true);
+});
+test('coerceRow converts a numeric select (doctor id) to a number', () => {
+  const { row, missing } = coerceRow(PATIENT_TABLES.booking, { staff_id: '3', booking_date: '2026-12-01', booking_time: '10:00', symptom: '' });
+  assert.deepEqual(missing, []); assert.equal(row.staff_id, 3); assert.equal(row.symptom, null);
 });

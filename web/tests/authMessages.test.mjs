@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { authMessage, signUpResult, hasAppAccess, SIGNUP_PENDING_APPROVAL, SIGNUP_CONFIRM_EMAIL } from '../js/authMessages.js';
+import { authMessage, signUpResult, hasAppAccess, accessFromProfile, SIGNUP_PENDING_APPROVAL, SIGNUP_CONFIRM_EMAIL } from '../js/authMessages.js';
 
 test('wrong password -> invalid credentials message', () => {
   assert.equal(authMessage({ message: 'Invalid login credentials' }), 'อีเมลหรือรหัสผ่านไม่ถูกต้อง');
@@ -30,9 +30,12 @@ test('signUpResult: confirm-email on, existing address (empty identities) -> alr
 test('signUpResult: error from Supabase', () => {
   assert.deepEqual(signUpResult(null, { message: 'User already registered' }), { ok: false, error: 'อีเมลนี้ถูกใช้สมัครแล้ว' });
 });
-test('hasAppAccess mirrors is_app_user(): staff/admin yes, patient or no profile no', () => {
+test('access: no profile -> waiting; patient -> own records; staff/admin -> everything', () => {
   assert.equal(hasAppAccess({ role: 'admin' }), true);
   assert.equal(hasAppAccess({ role: 'pharmacist' }), true);
-  assert.equal(hasAppAccess({ role: 'patient' }), false);
+  assert.equal(hasAppAccess({ role: 'patient' }), true);
   assert.equal(hasAppAccess(null), false);
+  assert.deepEqual(accessFromProfile(null), { linked: false, role: null, patient: false });
+  assert.deepEqual(accessFromProfile({ role: 'patient' }), { linked: true, role: 'patient', patient: true });
+  assert.deepEqual(accessFromProfile({ role: 'doctor' }), { linked: true, role: 'doctor', patient: false });
 });

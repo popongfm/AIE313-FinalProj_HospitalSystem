@@ -68,7 +68,12 @@ const U = { anon: { sb: fresh(), id: null, token: ANON } };
 { const sb = fresh(); const s = await sb.auth.signUp({ email: `self${t}@example.test`, password: 'secret123' });
   if (!s.data.session) throw new Error('self sign-up returned no session (is email confirmation on in config.toml?)');
   U.none = { sb, id: s.data.user.id, token: s.data.session.access_token }; }
-U.patient = await makeUser('patient', { role: 'patient', patient_id: idOf('select min(patient_id) from patient') + 1 });
+// the patient account is linked to a patient with visits, prescriptions waiting for screening and a booking today,
+// so every per-patient view has rows of its own
+const PID = idOf(`select min(v.patient_id) from prescription pr join visit v using (visit_id)
+  where pr.status in ('Pending','Screened') and v.patient_id in (select patient_id from booking where booking_date = current_date)`);
+const PHN = sql(`select hn from patient where patient_id = ${PID}`);
+U.patient = await makeUser('patient', { role: 'patient', patient_id: PID });
 U.nurse = await makeUser('nurse', { role: 'nurse', staff_id: STAFF.nurse });
 U.doctor = await makeUser('doctor', { role: 'doctor', staff_id: STAFF.doctor });
 U.pharmacist = await makeUser('pharm', { role: 'pharmacist', staff_id: STAFF.pharmacist });
@@ -78,6 +83,14 @@ const TABLES = ['department', 'staff', 'patient', 'room', 'bed', 'visit', 'admis
   'booking', 'feedback', 'drug', 'drug_lot', 'prescription', 'prescription_item', 'dispense_record', 'inventory', 'drug_allergy_record'];
 const VIEWS = ['v_booking_queue_today', 'v_doctor_workload', 'v_feedback_summary', 'v_bed_occupancy', 'v_visit_billing', 'v_top_diagnosis',
   'v_pharmacist_screening_queue', 'v_inventory_stock_status', 'v_drug_cost_summary'];
+// what a patient account must see: its own rows of 4 tables, its own rows of the 3 per-patient views, all of the summary views
+const OWN = (rel) => ({
+  patient: 1, booking: `select count(*) from booking where patient_id = ${PID}`, visit: `select count(*) from visit where patient_id = ${PID}`,
+  prescription: `select count(*) from prescription pr join visit v using (visit_id) where v.patient_id = ${PID}`,
+  v_booking_queue_today: `select count(*) from v_booking_queue_today where hn = '${PHN}'`, v_visit_billing: `select count(*) from v_visit_billing where hn = '${PHN}'`,
+  v_pharmacist_screening_queue: `select count(*) from v_pharmacist_screening_queue where hn = '${PHN}'`,
+})[rel];
+const patientExpect = (rel) => { const q = OWN(rel); return typeof q === 'number' ? q : q ? Number(sql(q)) : rel.startsWith('v_') ? Number(sql(`select count(*) from ${rel}`)) : 0; };
 const count = async (sb, rel) => { const r = await sb.from(rel).select('*', { count: 'exact', head: true }); return r.error ? `ERR ${r.error.code || r.status}` : r.count; };
 
 // ================= A. access control =================
@@ -86,8 +99,10 @@ for (const [who, u] of Object.entries(U)) {
   const staff = ['nurse', 'doctor', 'pharmacist', 'admin'].includes(who);
   for (const [label, rels] of [['20 ตาราง', TABLES], ['9 views', VIEWS]]) {
     const got = []; for (const r of rels) got.push([r, await count(u.sb, r)]);
-    const bad = got.filter(([, n]) => who === 'anon' ? !String(n).startsWith('ERR') : staff ? !(typeof n === 'number' && n > 0) : n !== 0);
-    check(C, `${who}: อ่าน ${label}`, who === 'anon' ? 'ถูกปฏิเสธทุกตัว' : staff ? 'เห็นข้อมูลทุกตัว' : '0 แถวทุกตัว',
+    const bad = got.filter(([r, n]) => who === 'anon' ? !String(n).startsWith('ERR') : staff ? !(typeof n === 'number' && n > 0)
+      : who === 'patient' ? n !== patientExpect(r) : n !== 0);
+    check(C, `${who}: อ่าน ${label}`, who === 'anon' ? 'ถูกปฏิเสธทุกตัว' : staff ? 'เห็นข้อมูลทุกตัว'
+      : who === 'patient' ? 'เฉพาะของตัวเอง (view ภาพรวมเห็นทั้งหมด)' : '0 แถวทุกตัว',
       bad.length ? `ผิด ${bad.length} ตัว: ${bad.map(([r, n]) => `${r}=${n}`).join(', ')}` : `ถูกทั้ง ${rels.length} ตัว`, bad.length === 0);
   }
 }
@@ -102,7 +117,9 @@ for (const who of ['none', 'patient']) {
   const del = await sb.from('feedback').delete().gt('feedback_id', 0).select();
   check(C, `${who}: ลบ feedback`, 'ลบไม่ได้', del.error?.code ?? `${del.data?.length} แถว`, !(del.data?.length));
   const emb = await sb.from('patient').select('hn, visit(visit_id)');
-  check(C, `${who}: อ่านผ่าน embedding patient→visit`, '0 แถว', emb.error?.code ?? emb.data.length, !emb.error && emb.data.length === 0);
+  const own = who === 'patient';   // a patient sees its own row and its own visits, nobody else's
+  check(C, `${who}: อ่านผ่าน embedding patient→visit`, own ? `แถวของตัวเองแถวเดียว (${PHN})` : '0 แถว', emb.error?.code ?? `${emb.data.length} แถว ${emb.data.map((r) => r.hn)}`,
+    !emb.error && (own ? emb.data.length === 1 && emb.data[0].hn === PHN && emb.data[0].visit.length === patientExpect('visit') : emb.data.length === 0));
 }
 { const sb = U.pharmacist.sb;
   const ins = await sb.from('patient').insert({ hn: `HP${t}`.slice(0, 20), national_id: String(t).slice(-13).padStart(13, '9'), first_name: 'ทดสอบ', last_name: 'ระบบ' }).select();
@@ -145,6 +162,46 @@ for (const [name, tok] of [
   const f = await fetch(`${URL}/functions/v1/chat-mcp`, { method: 'POST', headers: { Authorization: `Bearer ${victim.token}`, 'content-type': 'application/json' }, body: '{"question":"x"}' });
   check(C, 'token เก่าของบัญชีที่ถูกลบ: ใช้ chat', 'ถูกปฏิเสธ', f.status, f.status === 401 || f.status === 403); }
 
+// ================= E. patient portal: own records, book / cancel, contact details only =================
+C = 'E ผู้ป่วย: ข้อมูลของตัวเอง';
+{ const sb = U.patient.sb;
+  const before = sql(`select row_to_json(p) from (select phone, address from patient where patient_id = ${PID}) p`);   // restored at the end
+  const up = await sb.from('patient').update({ phone: '0899999999', address: 'ที่อยู่ทดสอบ' }).eq('patient_id', PID).select('phone');
+  check(C, 'patient: แก้เบอร์โทร/ที่อยู่ของตัวเอง', 'สำเร็จ', up.error?.message ?? `${up.data.length} แถว`, !up.error && up.data.length === 1 && up.data[0].phone === '0899999999');
+  for (const [name, change] of [['ชื่อ', { first_name: 'แก้เอง' }], ['ประวัติแพ้ยา', { allergy_note: 'ไม่แพ้อะไรเลย' }], ['เลขบัตรประชาชน', { national_id: '1234567890123' }]]) {
+    const r = await sb.from('patient').update(change).eq('patient_id', PID).select();
+    check(C, `patient: แก้${name}ของตัวเอง`, 'ถูกปฏิเสธ 42501', r.error?.code ?? 'แก้ได้!', r.error?.code === '42501'); }
+  const other = idOf(`select min(patient_id) from patient where patient_id <> ${PID}`);
+  const ot = await sb.from('patient').update({ phone: '0811111111' }).eq('patient_id', other).select();
+  check(C, 'patient: แก้เบอร์คนไข้คนอื่น', 'ไม่มีแถวถูกแก้', ot.error?.code ?? `${ot.data.length} แถว`, !(ot.data?.length) && sql(`select coalesce(phone,'') from patient where patient_id=${other}`) !== '0811111111');
+  const docs = await sb.rpc('doctor_directory');
+  check(C, 'patient: ดูรายชื่อแพทย์สำหรับจองคิว', '> 0 คน', docs.error?.message ?? `${docs.data.length} คน`, !docs.error && docs.data.length > 0);
+  const nd = await U.none.sb.rpc('doctor_directory');
+  check(C, 'none: ดูรายชื่อแพทย์', '0 คน', nd.error?.code ?? `${nd.data.length} คน`, !nd.error && nd.data.length === 0);
+  const day = new Date(Date.now() + 40 * 864e5).toISOString().slice(0, 10);
+  const bkd = await sb.from('booking').insert({ staff_id: STAFF.doctor, booking_date: day, booking_time: '15:45', symptom: 'ทดสอบ' }).select().single();
+  check(C, 'patient: จองคิวให้ตัวเอง', 'สำเร็จ ได้เลขคิวอัตโนมัติ', bkd.error?.message ?? `queue_no=${bkd.data.queue_no} patient=${bkd.data.patient_id} ${bkd.data.status}`,
+    !bkd.error && bkd.data.patient_id === PID && bkd.data.queue_no >= 1 && bkd.data.status === 'pending');
+  for (const [name, row, code] of [
+    ['จองคิวให้คนอื่น', { patient_id: other, staff_id: STAFF.doctor, booking_date: day, booking_time: '15:50' }, '42501'],
+    ['จองคิวสถานะ confirmed เอง', { staff_id: STAFF.doctor, booking_date: day, booking_time: '15:55', status: 'confirmed' }, '42501'],
+    ['จองคิวย้อนหลัง', { staff_id: STAFF.doctor, booking_date: '2020-01-01', booking_time: '09:00' }, '23514'],
+  ]) { const r = await sb.from('booking').insert(row).select(); check(C, `patient: ${name}`, `ถูกปฏิเสธ ${code}`, r.error?.code ?? 'จองได้!', r.error?.code === code); }
+  if (bkd.data) {
+    const mv = await sb.from('booking').update({ booking_time: '16:30' }).eq('booking_id', bkd.data.booking_id).select();
+    check(C, 'patient: เลื่อนเวลาคิวเอง', 'ถูกปฏิเสธ 42501', mv.error?.code ?? 'เลื่อนได้!', mv.error?.code === '42501');
+    const cn = await sb.from('booking').update({ status: 'cancelled' }).eq('booking_id', bkd.data.booking_id).select('status');
+    check(C, 'patient: ยกเลิกคิวของตัวเอง', 'สำเร็จ', cn.error?.message ?? cn.data[0]?.status, !cn.error && cn.data[0]?.status === 'cancelled');
+    const dl = await sb.from('booking').delete().eq('booking_id', bkd.data.booking_id).select();
+    check(C, 'patient: ลบคิว', 'ลบไม่ได้', dl.error?.code ?? `${dl.data.length} แถว`, !(dl.data?.length) && sql(`select count(*) from booking where booking_id=${bkd.data.booking_id}`) === '1');
+    sql(`delete from booking where booking_id = ${bkd.data.booking_id}`);
+  }
+  const ob = idOf(`select min(booking_id) from booking where patient_id <> ${PID} and status in ('pending','confirmed')`);
+  const oc = await sb.from('booking').update({ status: 'cancelled' }).eq('booking_id', ob).select();
+  check(C, 'patient: ยกเลิกคิวของคนอื่น', 'ไม่มีแถวถูกแก้', oc.error?.code ?? `${oc.data.length} แถว`, !(oc.data?.length) && sql(`select status from booking where booking_id=${ob}`) !== 'cancelled');
+  sql(`update patient set (phone, address) = (select phone, address from json_populate_record(null::patient, $j$${before}$j$::json)) where patient_id = ${PID}`);
+}
+
 // ================= B/C/D. chat functions =================
 async function ask(fn, question = 'คำถามทดสอบ', who = 'pharmacist', rawBody) {
   const t0 = Date.now();
@@ -160,10 +217,14 @@ C = 'B chat: สิทธิ์ผู้ใช้';
 for (const fn of ['chat', 'chat-mcp']) {
   setScript({ sql: 'select hn, patient_first_name, allergy_note, generic_name from v_pharmacist_screening_queue limit 5',
     tool_calls: [{ name: 'query_view', args: { view: 'v_pharmacist_screening_queue', columns: ['hn', 'patient_first_name', 'allergy_note', 'generic_name'], limit: 5 } }] });
-  for (const who of ['anon', 'none', 'patient']) {
+  for (const who of ['anon', 'none']) {
     const r = await ask(fn, 'ขอรายชื่อผู้ป่วยที่แพ้ยา', who);
     check(C, `${fn}: ${who}`, who === 'anon' ? '401' : '403 "ยังไม่ได้รับสิทธิ์"', show(r), who === 'anon' ? r.status === 401 : r.status === 403 && /ยังไม่ได้รับสิทธิ์/.test(r.error ?? ''));
   }
+  { const r = await ask(fn, 'ขอรายชื่อผู้ป่วยที่แพ้ยา', 'patient');   // same question: a patient gets only its own rows
+    const want = Math.min(5, patientExpect('v_pharmacist_screening_queue'));
+    check(C, `${fn}: patient`, `เฉพาะแถวของตัวเอง ${want} แถว (${PHN})`, `${show(r)} hn=${[...new Set((r.rows ?? []).map((x) => x.hn))]}`,
+      r.status === 200 && !r.error && r.rows?.length === want && r.rows.every((x) => x.hn === PHN)); }
   for (const who of ['pharmacist', 'admin']) {
     const r = await ask(fn, 'ขอรายชื่อผู้ป่วยที่แพ้ยา', who);
     check(C, `${fn}: ${who}`, 'ได้ 5 แถว คอลัมน์ตามลำดับที่ขอ', `${show(r)} cols=${r.columns}`,
