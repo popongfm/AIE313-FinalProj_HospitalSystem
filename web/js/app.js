@@ -13,7 +13,8 @@ const HEADINGS = {
 };
 // app.html#chat etc. opens that tab; the landing page's shortcuts link here, and the tab survives the sign-in detour.
 const NEXT_KEY = 'aie313.nextTab';
-const wanted = location.hash.slice(1);
+// own keys only: mounts['constructor'] / ['toString'] come from Object.prototype and would break show()
+const wanted = Object.hasOwn(mounts, location.hash.slice(1)) ? location.hash.slice(1) : '';
 const store = (fn) => { try { fn(sessionStorage); } catch { /* storage blocked: just open the default tab */ } };
 
 async function init(session) {
@@ -41,8 +42,8 @@ document.getElementById('nav').addEventListener('click', (e) => {
   show(tab);
 });
 document.getElementById('logout').addEventListener('click', async () => { await signOut(); location.href = 'index.html'; });
-show(mounts[wanted] ? wanted : 'data');
+show(wanted || 'data');
 }
-if (mounts[wanted]) store((s) => s.setItem(NEXT_KEY, wanted));   // used by index.html if we get sent to sign in
+if (wanted) store((s) => s.setItem(NEXT_KEY, wanted));   // used by index.html if we get sent to sign in
 const session = await requireSession();
 if (session) { store((s) => s.removeItem(NEXT_KEY)); init(session); }
