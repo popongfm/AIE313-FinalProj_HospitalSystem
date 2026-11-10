@@ -37,9 +37,11 @@ def diagram(tables, title):
             L.append('    %s %s %s : "%s"' % (p, card, ch, cc))
     if 'profiles' in tset and 'auth_users' in tset:
         L.append('    auth_users ||--o| profiles : "user_id"')
+    if 'chat_logs' in tset and 'auth_users' in tset:   # logical link only: chat_logs.user_id has no FK
+        L.append('    auth_users ||..o{ chat_logs : "user_id (no FK)"')
     return '\n'.join(L) + '\n'
 
-core = ['department','staff','patient','profiles','auth_users']
+core = ['department','staff','patient','profiles','chat_logs','auth_users']
 A = ['booking','feedback']; C = ['room','bed','visit','admission','diagnosis','lab_result','insurance_coverage','daily_charge']
 B = ['drug','drug_lot','prescription','prescription_item','dispense_record','inventory','drug_allergy_record']
 allt = [t for t in cols]

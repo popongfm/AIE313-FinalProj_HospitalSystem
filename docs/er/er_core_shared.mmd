@@ -38,6 +38,16 @@ erDiagram
         int patient_id FK
         int staff_id FK
     }
+    chat_logs {
+        int chat_id PK
+        uuid user_id
+        text question
+        text generated_sql
+        text tool_name
+        int row_count
+        text error
+        timestamptz created_at
+    }
     auth_users {
         uuid id PK
     }
@@ -45,3 +55,4 @@ erDiagram
     patient |o--o{ profiles : "patient_id"
     staff |o--o{ profiles : "staff_id"
     auth_users ||--o| profiles : "user_id"
+    auth_users ||..o{ chat_logs : "user_id (no FK)"

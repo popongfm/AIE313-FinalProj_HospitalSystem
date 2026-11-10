@@ -1,5 +1,11 @@
 # AIE313 Hospital Information System + AI Chat — Implementation Plan
 
+> **หมายเหตุ (แก้ไข 2026-11-10):** ไฟล์นี้เป็นแผนเริ่มต้น บางส่วนไม่ตรงกับโค้ดปัจจุบันแล้ว ให้ยึดตามโค้ดใน `db/` และ `README.md` และไม่ควรอ้างแผนนี้ในรายงาน
+> - View ไม่ได้ใช้ `security_invoker` แต่เป็นแบบ owner-rights และเช็คสิทธิ์เองด้วย `(current_user NOT IN ('anon','authenticated') OR is_app_user())` (`db/05_views.sql`)
+> - `run_readonly_query` คืนค่า `json` (ใช้ `json_agg`) ไม่ใช่ `jsonb` เพื่อให้ลำดับคอลัมน์ตรงกับ SELECT และเป็นของ role `chat_reader` (`db/07_chat_support.sql`)
+> - Chat หลักคือ MCP (วิธี C) `chat-mcp` ส่วน Text-to-SQL (วิธี B) `chat` เป็นตัวสำรอง
+> - หน้าเว็บมีปุ่มสมัครสมาชิก บัญชีใหม่จะเห็นข้อมูลเมื่อ admin ผูก profile แล้ว
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Ship one merged hospital database on Supabase (booking + records + pharmacy), a deployed web app (Auth, CRUD, Views, Dashboard), and a read-only AI Chat that answers Thai/English questions from real data, plus every deliverable the course requires, by 2026-12-09.

@@ -19,24 +19,28 @@ const DB = { patient: [{ patient_id: 1, hn: 'HN1', national_id: '1100000000001',
   v_top_diagnosis: [{ icd_code: 'I10', description: 'ความดันโลหิตสูง', case_count: 9, rank_no: 1 }], v_feedback_summary: [],
   v_doctor_workload: [{ doctor_name: 'ก', status: 'pending', booking_count: 2 }, { doctor_name: 'ก', status: 'completed', booking_count: 1 }],
   v_visit_billing: [{ department: 'อายุรกรรม', month: '2026-10', total_amount: 100 }, { department: 'อายุรกรรม', month: '2026-10', total_amount: 50 }],
-  v_inventory_stock_status: [{ generic_name: 'Warfarin', lot_number: 'L1', quantity_on_hand: 20, reorder_point: 100, stock_status: 'REORDER_URGENT' }], booking: [] };
+  v_inventory_stock_status: [{ generic_name: 'Warfarin', lot_number: 'L1', quantity_on_hand: 20, reorder_point: 100, stock_status: 'REORDER_URGENT' }], booking: [],
+  profiles: [{ user_id: 'u-admin', role: 'admin' }] };
 const sess = () => JSON.parse(localStorage.getItem('mock_session') || 'null');
 export function createClient() {
   const qb = (table) => { const st = { op: 'select', filters: [] };
-    const b = { select() { return b; }, order() { return b; }, limit() { return b; }, eq(k, v) { st.filters.push([k, v]); return b; },
+    const b = { select() { return b; }, maybeSingle() { st.single = true; return b; }, order() { return b; }, limit() { return b; }, eq(k, v) { st.filters.push([k, v]); return b; },
       insert(row) { st.op = 'insert'; st.row = row; return b; }, update() { st.op = 'update'; return b; }, delete() { st.op = 'delete'; return b; },
       then(res) { if (st.op === 'insert' && table === 'booking') return res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } });
         if (st.op === 'delete' && table === 'patient') return res({ data: null, error: { code: '23503', message: 'violates foreign key' } });
         if (st.op === 'insert') { DB[table] = [...(DB[table] || []), st.row]; return res({ data: null, error: null }); }
-        let rows = DB[table] || []; st.filters.forEach(([k, v]) => { rows = rows.filter((r) => r[k] === v); }); res({ data: rows, error: null }); } };
+        let rows = DB[table] || []; st.filters.forEach(([k, v]) => { rows = rows.filter((r) => r[k] === v); }); res({ data: st.single ? (rows[0] || null) : rows, error: null }); } };
     return b; };
   const invoke = async (name, { body }) => { await new Promise((r) => setTimeout(r, 300));
     if (body.question.includes('ลบ')) return { data: { answer: '', sql: 'DELETE FROM patient', columns: [], rows: [], error: 'อนุญาตเฉพาะคำสั่ง SELECT เท่านั้น' }, error: null };
     if (body.question.includes('ว่าง')) return { data: { answer: 'ไม่พบข้อมูลที่ตรงกับคำถาม', sql: 'select 1', columns: [], rows: [], error: null }, error: null };
     return { data: { answer: 'มีแพทย์ 8 คน', sql: 'select count(*) as n from v_doctor_workload LIMIT 100', columns: ['n'], rows: [{ n: 8 }], error: null }, error: null }; };
   return { from: qb, functions: { invoke }, auth: {
-    async signInWithPassword({ password }) { if (password !== 'secret1') return { error: { message: 'Invalid login credentials' } }; localStorage.setItem('mock_session', '{"u":1}'); return { error: null }; },
-    async signUp() { return { error: { message: 'User already registered' } }; },
+    async signInWithPassword({ email, password }) { if (password !== 'secret1') return { error: { message: 'Invalid login credentials' } };
+      localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'new@b.th' ? 'u-new' : 'u-admin' } })); return { error: null }; },
+    async signUp({ email }) { window.__signups = (window.__signups || 0) + 1;
+      if (email === 'a@b.th') return { data: { user: { identities: [] }, session: null }, error: null };   // existing e-mail, confirm-email on
+      return { data: { user: { identities: [{}] }, session: null }, error: null }; },
     async signOut() { localStorage.removeItem('mock_session'); },
     async getSession() { return { data: { session: sess() } }; } } };
 }`;
@@ -55,7 +59,20 @@ await check('wrong password shows Thai error', async () => {
   await page.fill('#email', 'a@b.th'); await page.fill('#password', 'wrongpw'); await page.click('#login');
   await page.waitForFunction(() => document.getElementById('err').textContent.length > 0);
   assert.equal(await page.textContent('#err'), 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'); });
-await check('correct password reaches app', async () => { await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html'); await page.waitForSelector('#panel table'); });
+await check('sign-up with an existing e-mail shows Thai duplicate message', async () => {
+  await page.fill('#email', 'a@b.th'); await page.fill('#password', 'secret1'); await page.click('#signup');
+  await page.waitForFunction(() => document.getElementById('err').textContent.length > 0);
+  assert.equal(await page.textContent('#err'), 'อีเมลนี้ถูกใช้สมัครแล้ว'); assert.equal(await page.textContent('#ok'), ''); });
+await check('sign-up with a new e-mail stays on the page and says to wait for approval', async () => {
+  await page.fill('#email', 'new@b.th'); await page.click('#signup');
+  await page.waitForFunction(() => document.getElementById('ok').textContent.includes('ผู้ดูแลระบบอนุมัติ'));
+  assert.equal(await page.textContent('#err'), ''); assert.ok(page.url().endsWith('/index.html')); });
+await check('sign-up with a too-short password is blocked before calling Supabase', async () => {
+  const before = await page.evaluate(() => window.__signups); await page.fill('#password', '123'); await page.click('#signup');
+  assert.equal(await page.evaluate(() => window.__signups), before); });
+await check('correct password reaches app (approved account, no pending notice)', async () => {
+  await page.fill('#email', 'a@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html'); await page.waitForSelector('#panel table');
+  assert.equal(await page.locator('#pending').count(), 0); });
 await check('CRUD list shows patient row', async () => { assert.ok((await page.textContent('#panel table')).includes('HN1')); });
 await check('delete patient with dependents shows Thai FK error', async () => {
   const del = page.locator('#panel button', { hasText: 'ลบ' }).first(); await del.click(); await page.locator('#panel button', { hasText: 'ยืนยันลบ?' }).click();
@@ -87,6 +104,10 @@ await check('chat: refused dangerous question shows the reason and no table', as
 await check('chat: empty result shows ไม่พบข้อมูล', async () => {
   await page.fill('#q', 'ผลว่างไหม'); await page.click('#send');
   await page.waitForFunction(() => [...document.querySelectorAll('#log .msg.bot')].some((m) => m.textContent.includes('ไม่พบข้อมูล'))); });
+await check('account without an approved profile sees the pending notice', async () => {
+  await page.click('#logout'); await page.waitForURL('**/index.html');
+  await page.fill('#email', 'new@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html');
+  await page.waitForSelector('#pending'); assert.ok((await page.textContent('#pending')).includes('ยังไม่ได้รับสิทธิ์')); });
 await check('no uncaught page errors', async () => { assert.deepEqual(errors, [], JSON.stringify(errors)); });
 console.log(results.join('\n'));
 await browser.close(); server.close();

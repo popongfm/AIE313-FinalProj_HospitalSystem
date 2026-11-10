@@ -1,14 +1,18 @@
 # ระบบสารสนเทศโรงพยาบาล AIE313 + AI Chat
 
-Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS แบบ static (Vercel) · Chat แบบ Text-to-SQL ที่อ่านได้เฉพาะ 9 views แบบอ่านอย่างเดียว
-แผนงาน: `docs/superpowers/plans/` · ER diagram: `docs/er/` · กรณีทดสอบ: `docs/test-cases.md` · query วิเคราะห์: `analysis/analysis_queries.sql`
+Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS แบบ static (Vercel) · AI Chat (MCP เป็นค่าเริ่มต้น, Text-to-SQL เป็นตัวสำรอง) ที่อ่านได้เฉพาะ 9 views แบบอ่านอย่างเดียว
+งานที่เหลือของแต่ละคน: `docs/TEAM_HANDOFF.md` · แผนงาน: `docs/superpowers/plans/` · ER diagram: `docs/er/` · กรณีทดสอบ: `docs/test-cases.md` · query วิเคราะห์: `analysis/analysis_queries.sql`
 
 ## ขั้นตอน deploy (ทำครั้งเดียว)
 1. **โปรเจกต์ Supabase** → SQL editor: รัน `schema.sql` แล้วตามด้วย `seed.sql` (22 ตาราง, 9 views, RLS, role `chat_reader`, ฟังก์ชัน `run_readonly_query`)
    ถ้าเคยรัน `schema.sql` เวอร์ชันเก่าไปแล้ว (ที่ล้มตรง `ALTER FUNCTION ... OWNER TO chat_reader` หรือทำให้ `run_readonly_query` ยังเป็นของ `postgres`) ให้เริ่มจากโปรเจกต์ใหม่ หรือรันคำสั่งนี้ก่อน: `DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres, anon, authenticated, service_role;`
-2. Auth → **ปิด "Allow new users to sign up"** แล้วสร้างผู้ใช้เองที่ Auth → Users จากนั้นผูกผู้ใช้แต่ละคนกับ profile ในฐานะ admin ไม่อย่างนั้น RLS จะไม่แสดงข้อมูลอะไรเลย:
-   `INSERT INTO profiles(user_id, role) VALUES ('<auth user uuid>', 'admin');`
-   **ต้องทำ:** `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
+2. **Auth** (หน้าเว็บมีปุ่มสมัครสมาชิกตามที่โจทย์กำหนด):
+   - Authentication → Sign In / Providers: **เปิด "Allow new users to sign up"** ไว้
+   - **"Confirm email"**: สำหรับ demo ให้ปิดไว้ เพราะ SMTP เริ่มต้นของ Supabase ส่งอีเมลยืนยันได้เฉพาะอีเมลของสมาชิกในโปรเจกต์ ถ้าจะเปิดไว้ต้องตั้ง SMTP เอง และใส่ URL ของ Vercel ใน Authentication → URL Configuration (Site URL / Redirect URLs) ลิงก์ยืนยันจึงจะพากลับมาที่เว็บ
+   - บัญชีที่สมัครใหม่ **ยังไม่เห็นข้อมูล** (RLS, view และ chat เช็คสิทธิ์ทั้งหมด) จนกว่า admin จะผูกบัญชีกับ profile ที่ไม่ใช่ patient ใน SQL editor ดู uuid ได้ที่ Authentication → Users:
+     `INSERT INTO profiles(user_id, role) VALUES ('<auth user uuid>', 'admin');`
+     `INSERT INTO profiles(user_id, role, staff_id) VALUES ('<auth user uuid>', 'doctor', <staff_id>);` (หรือ `pharmacist` / `nurse`)
+   - **ต้องทำ:** `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
 3. **Edge Functions** (ต้องมี Supabase CLI) chat หลักคือ **MCP (Method C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, Method B) เก็บไว้เป็นทางเลือก (ตั้ง `CHAT_FUNCTION=chat` ใน Vercel ถ้าจะใช้):
    `supabase functions deploy chat-mcp --project-ref <ref>` (และ `chat` ถ้าต้องการ) แล้วตามด้วย
    `supabase secrets set GROQ_API_KEY=<key> LLM_MODEL=llama-3.3-70b-versatile --project-ref <ref>`

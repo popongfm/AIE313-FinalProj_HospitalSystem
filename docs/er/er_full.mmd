@@ -1,5 +1,5 @@
 ---
-title: ER Diagram - Hospital Information System (merged, 21 tables)
+title: ER Diagram - Hospital Information System (merged, 22 tables)
 ---
 erDiagram
     admission {
@@ -25,6 +25,16 @@ erDiagram
         smallint queue_no
         text symptom
         varchar status
+        timestamptz created_at
+    }
+    chat_logs {
+        int chat_id PK
+        uuid user_id
+        text question
+        text generated_sql
+        text tool_name
+        int row_count
+        text error
         timestamptz created_at
     }
     daily_charge {
@@ -212,3 +222,4 @@ erDiagram
     drug_lot ||--o{ inventory : "lot_id"
     drug ||--o{ drug_allergy_record : "drug_id"
     auth_users ||--o| profiles : "user_id"
+    auth_users ||..o{ chat_logs : "user_id (no FK)"
