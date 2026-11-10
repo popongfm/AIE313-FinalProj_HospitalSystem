@@ -34,8 +34,8 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
      | บัญชี | ตาราง (CRUD) | รายงาน / Dashboard / Chat |
      |---|---|---|
      | ไม่มี profile | ไม่เห็นอะไร | ไม่เห็นอะไร / chat ตอบ 403 |
-     | `patient` | เห็นเฉพาะของตัวเองใน `patient`, `booking`, `visit`, `prescription`; จองคิว (ระบบใส่เลขคิวให้) และยกเลิกคิวของตัวเอง; แก้ได้เฉพาะเบอร์โทร อีเมล ที่อยู่ | view รายคน (คิววันนี้ นัดหมาย ค่ารักษา ใบสั่งยา) เฉพาะของตัวเอง, view ภาพรวมเห็นทั้งหมด; chat ตอบจากข้อมูลชุดเดียวกันนี้ |
-     | `admin`, `doctor`, `pharmacist`, `nurse` | ทุกตาราง | ทุกแถว |
+     | `patient` | เห็นเฉพาะของตัวเองใน `patient`, `booking`, `visit`, `prescription`; จองคิว (ระบบใส่เลขคิวให้) และยกเลิกคิวของตัวเอง; แก้ได้เฉพาะเบอร์โทร อีเมล ที่อยู่ | ไม่มีแท็บรายงาน; Dashboard แสดงค่ารักษารายเดือนของตัวเอง; chat ตอบจาก view รายคน (เฉพาะของตัวเอง) และ view ภาพรวม |
+     | `admin`, `doctor`, `pharmacist`, `nurse` | ทุกตาราง | รายงานทุกแถว; Dashboard ตาม role (admin ทุกกราฟ D1–D5, doctor D1 D4, nurse D4 D1, pharmacist D5 D3) |
 4. **Edge Functions** (ต้องมี Supabase CLI: `brew install supabase/tap/supabase` แล้ว `supabase login`) รันในโฟลเดอร์ repo
    chat หลักคือ **MCP (วิธี C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, วิธี B) เป็นตัวสำรอง:
    `supabase functions deploy chat-mcp --project-ref <ref>` (และ `chat` ถ้าต้องการ)

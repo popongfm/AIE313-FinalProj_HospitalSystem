@@ -19,7 +19,7 @@ Status legend: **mock** = verified automatically against a mocked Supabase clien
 | C4 | Delete a patient that has visits | "ลบ/แก้ไขไม่ได้ เพราะมีข้อมูลอื่นอ้างอิงอยู่" (23503) | As expected | mock PASS |
 | C5 | Create, edit, delete a patient with no dependants | Row added, changed, removed | | todo |
 | V1 | Open each of the 10 views | Table (or "ไม่พบข้อมูล" when empty) | v_top_diagnosis / v_feedback_summary checked | mock PASS (2/9) |
-| D1 | Open Dashboard | 3 charts (D1 bookings, D2 billing, D3 low stock) | 3 charts drawn | mock PASS |
+| D1 | Open Dashboard as admin / doctor / nurse / pharmacist | admin 5 charts D1–D5; doctor D1 D4; nurse D4 D1; pharmacist D5 D3 | admin 5, nurse D4 D1 (D4 failing does not block D1), pharmacist D5 D3 | mock PASS (admin, nurse, pharmacist) |
 | S1 | Call `/rest/v1/patient` with the anon key, no session | HTTP 401 / permission denied, no rows | RLS tested in `db/tests/70_rls.sql` | DB PASS, HTTP todo |
 | S2 | Signed in as an unapproved account (no profile), open each of the 10 views | Every view returns 0 rows (no HN, names or allergies) | 0 rows in all 10 views (`db/tests/70_rls.sql`) | DB PASS, HTTP todo |
 | S3 | Signed in as an unapproved account, ask any Chat question | HTTP 403, message "บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ" | | todo |
@@ -28,7 +28,7 @@ Status legend: **mock** = verified automatically against a mocked Supabase clien
 | P2 | Patient: "+ จองคิว", choose a doctor, date, time | Booking created with the next queue number, status pending; a past date is refused | | mock PASS, DB PASS, todo |
 | P3 | Patient: "ยกเลิกคิว" on a pending booking | Status becomes cancelled; changing time or deleting is refused | | DB PASS, todo |
 | P4 | Patient: edit own phone / email / address; try to change name or allergy note | Contact details saved; other fields refused ("ไม่มีสิทธิ์ใช้งาน") | | DB PASS, todo |
-| P5 | Patient: open the 10 views and the Dashboard | Per-patient views (คิววันนี้, นัดหมาย, ค่ารักษา, ใบสั่งยารอคัดกรอง) show only own rows; summary views show the whole hospital | | DB PASS, todo |
+| P5 | Patient: menu and Dashboard | No "รายงาน (Views)" tab; `app.html#views` opens "ข้อมูลของฉัน"; Dashboard shows only "ค่ารักษาของฉันรายเดือน" (own rows) | Tab hidden, #views falls back, one chart | mock PASS, todo |
 | P6 | Patient: ask Chat "ผู้ป่วยที่แพ้ยามีใครบ้าง" | Only the patient's own rows (same rule as the views) | | DB PASS, todo |
 | P7 | Patient: ask Chat "ฉันมีนัดหมายอะไรบ้าง" | Tool on `v_upcoming_bookings`; only the patient's own bookings from today on | | DB PASS, todo |
 
