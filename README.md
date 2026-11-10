@@ -9,7 +9,16 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
 
 ### 1. Supabase
 1. สร้างโปรเจกต์ → SQL editor: รัน `schema.sql` แล้วตามด้วย `seed.sql` (22 ตาราง, 9 views, RLS, role `chat_reader`, ฟังก์ชัน `run_readonly_query`)
-   ถ้าเคยรัน `schema.sql` เวอร์ชันเก่าไปแล้ว (ที่ล้มตรง `ALTER FUNCTION ... OWNER TO chat_reader` หรือทำให้ `run_readonly_query` ยังเป็นของ `postgres`) ให้เริ่มจากโปรเจกต์ใหม่ หรือรันคำสั่งนี้ก่อน: `DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO postgres, anon, authenticated, service_role;`
+   `schema.sql` รันได้ครั้งเดียวบนโปรเจกต์ที่ว่าง ถ้าเคยรันไปแล้ว (เช่นเจอ `already exists`) ให้สร้างโปรเจกต์ใหม่ หรือล้าง schema `public` ด้วยคำสั่งนี้ก่อน **ข้อมูลทุกตารางใน `public` จะหายรวมถึง `profiles`** (บัญชีใน Auth ยังอยู่ แต่ต้องผูก profile ใหม่) บรรทัด `ALTER DEFAULT PRIVILEGES` คืนสิทธิ์ตั้งต้นของ Supabase ถ้าไม่ใส่ `service_role` จะอ่าน `profiles` ไม่ได้และ chat จะตอบ 403 กับทุกบัญชี:
+   ```sql
+   DROP SCHEMA IF EXISTS public CASCADE;
+   CREATE SCHEMA public;
+   GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+   GRANT ALL ON SCHEMA public TO postgres;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon, authenticated, service_role;
+   ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+   ```
 2. SQL editor: `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
 3. **Auth** (หน้าเว็บมีปุ่มสมัครสมาชิกตามที่โจทย์กำหนด):
    - Authentication → Sign In / Providers: **เปิด "Allow new users to sign up"** ไว้
