@@ -2,7 +2,7 @@ import { supabase } from './supabaseClient.js';
 import { friendlyError } from './errors.js';
 import { coerceRow, bangkokDate, toDatetimeLocal } from './helpers.js';
 import { TABLES, PATIENT_TABLES } from './tables.js';
-import { renderTable } from './table.js';
+import { renderTable, withToolbar } from './table.js';
 
 // Option lists loaded from the database for 'select' fields with a `source` (patients cannot read staff directly).
 const SOURCES = {
@@ -91,7 +91,7 @@ export async function mountCrudPage(el, access = {}) {
       return box;
     };
     const hasActions = can(cfg, 'edit') || can(cfg, 'remove') || cfg.cancel;
-    list.appendChild(hasActions ? renderTable(rows, 'จัดการ', (r) => actions(data[rows.indexOf(r)])) : renderTable(rows));
+    list.appendChild(withToolbar(hasActions ? renderTable(rows, 'จัดการ', (r) => actions(data[rows.indexOf(r)])) : renderTable(rows)));
   }
   async function remove(row) {
     const cfg = tables[sel.value];

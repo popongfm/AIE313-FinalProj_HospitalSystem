@@ -79,6 +79,18 @@ await check('duplicate booking shows Thai duplicate error', async () => {
 await check('views page shows rows, and ไม่พบข้อมูล for an empty view', async () => {
   await page.click('[data-tab=views]'); await page.selectOption('#v', 'v_top_diagnosis'); await page.waitForSelector('#out table');
   await page.selectOption('#v', 'v_feedback_summary'); await page.waitForFunction(() => document.getElementById('out').textContent.includes('ไม่พบข้อมูล')); });
+await check('views: report names in Thai, grouped by zone; status shown as a badge', async () => {
+  await page.click('[data-tab=views]'); await page.selectOption('#v', 'v_inventory_stock_status'); await page.waitForSelector('#out table');
+  assert.equal(await page.textContent('#v option[value=v_inventory_stock_status]'), 'สถานะสต็อกยา (v_inventory_stock_status)');
+  assert.deepEqual(await page.$$eval('#v optgroup', (g) => g.map((x) => x.label)), ['นัดหมาย', 'เวชระเบียน', 'เภสัชกรรม']);
+  assert.equal(await page.getAttribute('#out .badge', 'data-tone'), 'danger'); assert.equal(await page.textContent('#out .badge'), 'ต้องสั่งด่วน');
+  assert.equal(await page.textContent('.zone-sign strong'), 'เภสัชกรรม'); });
+await check('table search hides rows and updates the count', async () => {
+  await page.click('[data-tab=dash]'); await page.click('[data-tab=data]'); await page.waitForSelector('#list table');
+  await page.fill('#list .table-search', 'ไม่มีใครชื่อนี้');
+  assert.equal(await page.locator('#list tbody tr:visible').count(), 0); assert.equal(await page.textContent('#list .table-count'), 'แสดง 0 จาก 1 รายการ');
+  await page.fill('#list .table-search', 'hn1'); assert.equal(await page.locator('#list tbody tr:visible').count(), 1);
+  assert.equal(await page.textContent('#list .table-count'), 'แสดง 1 จาก 1 รายการ'); });
 const headings = () => page.$$eval('#panel h3', (h) => h.map((x) => x.textContent));
 await check('admin dashboard draws all 5 staff charts in order', async () => {
   await page.evaluate(() => { window.__charts = []; });
