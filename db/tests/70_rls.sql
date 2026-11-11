@@ -39,14 +39,16 @@ SELECT set_config('test.n_booking', (SELECT count(*) FROM booking WHERE patient_
 SELECT set_config('test.n_visit', (SELECT count(*) FROM visit WHERE patient_id = current_setting('test.pid')::int)::text, true);
 SELECT set_config('test.n_rx', (SELECT count(*) FROM prescription pr JOIN visit v USING (visit_id) WHERE v.patient_id = current_setting('test.pid')::int)::text, true);
 SELECT set_config('test.doctor', (SELECT min(staff_id) FROM staff WHERE role = 'doctor')::text, true);
+SELECT set_config('request.jwt.claim.sub', '', true);   -- set up links as the SQL editor would
 INSERT INTO auth.users(id, email) VALUES ('00000000-0000-0000-0000-0000000000bb', 'patient@x.th');
-INSERT INTO profiles(user_id, role, patient_id) VALUES ('00000000-0000-0000-0000-0000000000bb', 'patient', current_setting('test.pid')::int);
+UPDATE patient SET user_id = '00000000-0000-0000-0000-0000000000bb' WHERE patient_id = current_setting('test.pid')::int;
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000bb', true);
 SET LOCAL ROLE authenticated;
 DO $$
 DECLARE pid int := current_setting('test.pid')::int; my_hn text; v text; n bigint;
 BEGIN
   ASSERT my_patient_id() = pid, 'my_patient_id() must return the linked patient';
+  ASSERT my_role() = 'patient' AND NOT is_app_user(), 'a patient account is not staff';
   ASSERT (SELECT count(*) FROM patient) = 1 AND (SELECT patient_id FROM patient) = pid, 'patient sees exactly its own patient row';
   SELECT hn INTO my_hn FROM patient;
   ASSERT (SELECT count(*) FROM booking) = current_setting('test.n_booking')::int AND NOT EXISTS (SELECT 1 FROM booking WHERE patient_id <> pid), 'own bookings only';
@@ -78,6 +80,8 @@ DO $$ BEGIN
   BEGIN UPDATE patient SET first_name = 'x' WHERE patient_id = current_setting('test.pid')::int; RAISE EXCEPTION 'name change allowed';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   BEGIN UPDATE patient SET allergy_note = 'ไม่แพ้ยา (แก้เอง)' WHERE patient_id = current_setting('test.pid')::int; RAISE EXCEPTION 'allergy change allowed';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN UPDATE patient SET user_id = NULL WHERE patient_id = current_setting('test.pid')::int; RAISE EXCEPTION 'patient unlinked itself';
   EXCEPTION WHEN insufficient_privilege THEN NULL; END;
   UPDATE patient SET phone = '0811111111' WHERE patient_id = current_setting('test.other')::int;   -- RLS: matches no row
   BEGIN INSERT INTO patient(hn, national_id, first_name, last_name) VALUES ('HZ1', '1999999999999', 'a', 'b'); RAISE EXCEPTION 'patient insert allowed';
@@ -111,24 +115,53 @@ DO $$ BEGIN
   ASSERT EXISTS (SELECT 1 FROM booking WHERE booking_id = current_setting('test.new_booking')::int), 'patient deleted a booking';
   ASSERT (SELECT first_name FROM patient WHERE patient_id = current_setting('test.pid')::int) <> 'x', 'patient changed its name';
 END $$;
-SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000aa', true);
-INSERT INTO profiles(user_id, role) VALUES ('00000000-0000-0000-0000-0000000000aa', 'admin');
+-- a nurse: full app access, but cannot promote itself or anyone else, nor relink accounts
+SELECT set_config('request.jwt.claim.sub', '', true);
+INSERT INTO auth.users(id, email) VALUES ('00000000-0000-0000-0000-0000000000dd', 'nurse@x.th');
+UPDATE staff SET user_id = '00000000-0000-0000-0000-0000000000dd' WHERE staff_id = (SELECT min(staff_id) FROM staff WHERE role = 'nurse');
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000dd', true);
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN
+  ASSERT is_app_user() AND my_role() = 'nurse' AND my_patient_id() IS NULL, 'nurse is a staff account';
+  ASSERT (SELECT count(*) FROM patient) >= 30, 'staff should read patient';
+  UPDATE staff SET phone = '0812345678' WHERE user_id = auth.uid();   -- ordinary details: allowed
+  BEGIN UPDATE staff SET role = 'admin' WHERE user_id = auth.uid(); RAISE EXCEPTION 'nurse promoted itself';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN UPDATE staff SET email = 'mine@x.th' WHERE user_id IS NULL AND role = 'doctor'; RAISE EXCEPTION 'nurse changed a doctor e-mail (could claim the doctor at sign-up)';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN INSERT INTO staff(first_name, last_name, role) VALUES ('x', 'y', 'admin'); RAISE EXCEPTION 'nurse created an admin';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  BEGIN UPDATE patient SET user_id = auth.uid() WHERE patient_id = current_setting('test.other')::int; RAISE EXCEPTION 'nurse linked a patient';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
+RESET ROLE;
+-- an admin (a staff row with role 'admin') may manage links and roles
+SELECT set_config('request.jwt.claim.sub', '', true);   -- as in the SQL editor: no signed-in user
+INSERT INTO staff(first_name, last_name, role, email, user_id) VALUES ('ผู้ดูแล', 'ระบบ', 'admin', 'staff@x.th', '00000000-0000-0000-0000-0000000000aa');
+SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000aa', true);
+SET LOCAL ROLE authenticated;
+DO $$ BEGIN
+  ASSERT is_admin() AND my_role() = 'admin', 'admin account';
   ASSERT (SELECT count(*) FROM patient) >= 30, 'authenticated should read patient';
   ASSERT (SELECT count(*) FROM v_doctor_workload) >= 1, 'authenticated should read views';
   INSERT INTO department(name) VALUES ('__rls_probe__');
   DELETE FROM department WHERE name = '__rls_probe__';
-  ASSERT (SELECT count(*) FROM profiles) = 1, 'authenticated sees only its own profile';
+  UPDATE staff SET role = 'pharmacist' WHERE user_id = '00000000-0000-0000-0000-0000000000dd';
+  ASSERT (SELECT role FROM staff WHERE user_id = '00000000-0000-0000-0000-0000000000dd') = 'pharmacist', 'admin can change a role';
 END $$;
 RESET ROLE;
--- a signed-in user cannot self-assign a role by inserting a profile
+-- a signed-in user without a link cannot link itself
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000cc', true);
 INSERT INTO auth.users(id, email) VALUES ('00000000-0000-0000-0000-0000000000cc', 'u@x.th');
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN
-  INSERT INTO profiles(user_id, role) VALUES (auth.uid(), 'admin');
-  RAISE EXCEPTION 'authenticated must not insert profiles';
-EXCEPTION WHEN insufficient_privilege THEN NULL; END $$;
+  ASSERT my_role() IS NULL, 'unlinked account has no role';
+  BEGIN INSERT INTO staff(first_name, last_name, role, user_id) VALUES ('a', 'b', 'admin', auth.uid()); RAISE EXCEPTION 'unlinked user inserted staff';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+  UPDATE staff SET user_id = auth.uid() WHERE user_id IS NULL;   -- RLS: matches no row
+  BEGIN PERFORM role_of(auth.uid()); RAISE EXCEPTION 'authenticated must not call role_of';
+  EXCEPTION WHEN insufficient_privilege THEN NULL; END;
+END $$;
 RESET ROLE;
+DO $$ BEGIN ASSERT NOT EXISTS (SELECT 1 FROM staff WHERE user_id = '00000000-0000-0000-0000-0000000000cc'), 'unlinked user linked itself'; END $$;
 SELECT 'rls ok' AS result;

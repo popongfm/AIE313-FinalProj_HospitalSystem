@@ -60,7 +60,7 @@
         <span class="you-are-here" aria-hidden="true">คุณอยู่ที่นี่</span>
 
         <div class="hero-card" id="signin">
-          <h2>เข้าสู่ระบบสำหรับบุคลากร</h2>
+          <h2>เข้าสู่ระบบ</h2>
           <form id="form">
             <label for="email">อีเมล</label><input id="email" type="email" required autocomplete="username">
             <label for="password">รหัสผ่าน</label><input id="password" type="password" required minlength="6" autocomplete="current-password">
@@ -68,9 +68,9 @@
             <div id="ok" class="ok" role="status"></div>
             <div class="row">
               <button class="primary" type="submit" id="login">เข้าสู่ระบบ</button>
-              <button type="button" id="signup">สมัครสมาชิก</button>
+              <a class="btn" id="signup" href="register.html">สมัครสมาชิก</a>
             </div>
-            <p class="hint">สมัครแล้วจะยังไม่เห็นข้อมูลจนกว่าผู้ดูแลระบบจะอนุมัติสิทธิ์ (ผูกบัญชีกับข้อมูลผู้ป่วยของคุณ หรือกับแพทย์ เภสัชกร พยาบาล)</p>
+            <p class="hint">ยังไม่มีบัญชี? สมัครได้ทั้งผู้ป่วยและเจ้าหน้าที่ ระบบผูกบัญชีกับข้อมูลของคุณให้อัตโนมัติ</p>
           </form>
         </div>
         </div>
@@ -174,8 +174,8 @@ LIMIT 100</pre></details></div>
       <div class="wrap">
         <h2>ขั้นตอนเข้าใช้งาน</h2>
         <ol class="steps">
-          <li><strong>สมัครด้วยอีเมล</strong><span>กดสมัครสมาชิกที่หน้านี้ ใช้อีเมลและรหัสผ่านอย่างน้อย 6 ตัวอักษร</span></li>
-          <li><strong>รอผู้ดูแลระบบอนุมัติ</strong><span>ผู้ดูแลระบบผูกบัญชีกับข้อมูลผู้ป่วยของคุณ หรือกับบทบาท เช่น แพทย์ พยาบาล หรือเภสัชกร</span></li>
+          <li><strong>สมัครสมาชิก</strong><span>เลือกว่าเป็นผู้ป่วยหรือเจ้าหน้าที่ ผู้ป่วยกรอกเลขบัตรประชาชนและวันเกิด เจ้าหน้าที่ใช้อีเมลที่ผู้ดูแลระบบบันทึกไว้</span></li>
+          <li><strong>ระบบผูกบัญชีให้อัตโนมัติ</strong><span>ผู้ป่วยผูกกับเวชระเบียนเดิมหรือได้ HN ใหม่ เจ้าหน้าที่ผูกกับตำแหน่งของตน (แพทย์ พยาบาล เภสัชกร ผู้ดูแลระบบ)</span></li>
           <li><strong>เข้าสู่ระบบ</strong><span>เห็นข้อมูล รายงาน Dashboard และใช้ผู้ช่วย AI ได้ตามสิทธิ์</span></li>
         </ol>
       </div>
@@ -190,24 +190,22 @@ LIMIT 100</pre></details></div>
   </footer>
 
   <script type="module">
-    import { signIn, signUp } from './js/auth.js';
+    import { signIn } from './js/auth.js';
     const $ = (id) => document.getElementById(id);
     const show = (errText, okText) => { $('err').textContent = errText || ''; $('ok').textContent = okText || ''; };
-    async function run(fn) {
+    async function run(fn) {   // sign-up has its own page: register.html
       show();
       if (!$('form').reportValidity()) return;
-      $('login').disabled = $('signup').disabled = true;
+      $('login').disabled = true;
       try {
         const r = await fn($('email').value.trim(), $('password').value);
         if (!r.ok) return show(r.error);
-        if (r.message) return show('', r.message);   // sign-up: stay on this page
         let next = '';   // a shortcut that sent the user here to sign in (see js/app.js)
         try { next = sessionStorage.getItem('aie313.nextTab') || ''; sessionStorage.removeItem('aie313.nextTab'); } catch { /* storage blocked */ }
         location.href = 'app.html' + (/^(data|views|dash|chat)$/.test(next) ? '#' + next : '');
-      } finally { $('login').disabled = $('signup').disabled = false; }
+      } finally { $('login').disabled = false; }
     }
     $('form').addEventListener('submit', (e) => { e.preventDefault(); run(signIn); });
-    $('signup').addEventListener('click', () => run(signUp));
   </script>
 </body>
 </html>

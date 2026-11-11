@@ -57,6 +57,8 @@ def main():
         dept = (i % 6) + 1 if role == 'doctor' else 7 if role in ('pharmacist','technician') else 8
         staff.append((i, FIRST[(i+3) % 20], LAST[(i*7) % 10], role, dept, '%s-%03d' % (role[:3].upper(), i),
                       '09%08d' % r.randint(10000000, 99999999), 'staff%d@hospital.example' % i))
+    # demo admin: sign up on the website with this e-mail and the account becomes admin (sign-up trigger, 01_core.sql)
+    staff.append((21, 'ผู้ดูแล', 'ระบบ', 'admin', None, None, None, 'admin@hospital.example'))
     emit('staff', ['staff_id','first_name','last_name','role','department_id','license_no','phone','email'], staff)
 
     pats = []

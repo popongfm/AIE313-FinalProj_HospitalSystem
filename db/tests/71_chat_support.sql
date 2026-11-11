@@ -46,12 +46,12 @@ END $$;
 RESET ROLE;
 
 -- the RPC applies the asking user's access (as_user): a patient sees only its own rows, staff everything,
--- an account without a profile nothing; without as_user (SQL editor / tests) it is unrestricted
+-- an account not linked yet nothing; without as_user (SQL editor / tests) it is unrestricted
 SELECT set_config('test.pid', (SELECT min(v.patient_id) FROM prescription pr JOIN visit v USING (visit_id) WHERE pr.status IN ('Pending', 'Screened'))::text, true);
 INSERT INTO auth.users(id, email) VALUES ('00000000-0000-0000-0000-0000000000c1', 'p@x.th'), ('00000000-0000-0000-0000-0000000000c2', 'd@x.th'),
                                          ('00000000-0000-0000-0000-0000000000c3', 'n@x.th');
-INSERT INTO profiles(user_id, role, patient_id) VALUES ('00000000-0000-0000-0000-0000000000c1', 'patient', current_setting('test.pid')::int);
-INSERT INTO profiles(user_id, role, staff_id) VALUES ('00000000-0000-0000-0000-0000000000c2', 'doctor', (SELECT min(staff_id) FROM staff WHERE role = 'doctor'));
+UPDATE patient SET user_id = '00000000-0000-0000-0000-0000000000c1' WHERE patient_id = current_setting('test.pid')::int;
+UPDATE staff SET user_id = '00000000-0000-0000-0000-0000000000c2' WHERE staff_id = (SELECT min(staff_id) FROM staff WHERE role = 'doctor');
 SELECT set_config('test.all_rows', (SELECT count(*) FROM v_pharmacist_screening_queue)::text, true);
 SELECT set_config('test.my_hn', (SELECT hn FROM patient WHERE patient_id = current_setting('test.pid')::int), true);
 SET LOCAL ROLE service_role;
@@ -63,8 +63,8 @@ BEGIN
   ASSERT NOT EXISTS (SELECT 1 FROM json_array_elements(r) e WHERE e->>'hn' IS DISTINCT FROM current_setting('test.my_hn')), 'patient chat shows other patients';
   ASSERT json_array_length(run_readonly_query('select * from v_doctor_workload', '00000000-0000-0000-0000-0000000000c1')) > 0, 'patient chat sees summary views';
   ASSERT json_array_length(run_readonly_query(q, '00000000-0000-0000-0000-0000000000c2')) = total, 'doctor chat sees every row';
-  ASSERT json_array_length(run_readonly_query(q, '00000000-0000-0000-0000-0000000000c3')) = 0, 'account without profile sees nothing';
-  ASSERT json_array_length(run_readonly_query('select * from v_doctor_workload', '00000000-0000-0000-0000-0000000000c3')) = 0, 'account without profile sees no summary either';
+  ASSERT json_array_length(run_readonly_query(q, '00000000-0000-0000-0000-0000000000c3')) = 0, 'unlinked account sees nothing';
+  ASSERT json_array_length(run_readonly_query('select * from v_doctor_workload', '00000000-0000-0000-0000-0000000000c3')) = 0, 'unlinked account sees no summary either';
   ASSERT json_array_length(run_readonly_query(q)) = total, 'without as_user the RPC is unrestricted (SQL editor, tests)';
 END $$;
 RESET ROLE;

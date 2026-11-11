@@ -80,6 +80,7 @@ erDiagram
         varchar blood_type
         text allergy_note
         timestamptz created_at
+        uuid user_id FK
     }
     staff {
         int staff_id PK
@@ -90,6 +91,7 @@ erDiagram
         varchar license_no
         char phone
         varchar email
+        uuid user_id FK
     }
     visit {
         int visit_id PK
@@ -100,12 +102,11 @@ erDiagram
         timestamptz discharge_date
         varchar status
     }
-    visit ||--o{ prescription : "visit_id"
-    staff ||--o{ prescription : "staff_id"
-    patient ||--o{ drug_allergy_record : "patient_id"
     patient ||--o{ visit : "patient_id"
     staff |o--o{ visit : "staff_id"
     drug ||--o{ drug_lot : "drug_id"
+    visit ||--o{ prescription : "visit_id"
+    staff ||--o{ prescription : "staff_id"
     prescription ||--o{ prescription_item : "prescription_id"
     drug ||--o{ prescription_item : "drug_id"
     prescription_item ||--o{ dispense_record : "item_id"
@@ -113,4 +114,5 @@ erDiagram
     drug_lot ||--o{ dispense_record : "lot_id"
     drug ||--o{ inventory : "drug_id"
     drug_lot ||--o{ inventory : "lot_id"
+    patient ||--o{ drug_allergy_record : "patient_id"
     drug ||--o{ drug_allergy_record : "drug_id"

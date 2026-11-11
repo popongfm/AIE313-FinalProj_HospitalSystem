@@ -1,4 +1,4 @@
--- Row Level Security: anon gets nothing; linked staff users (profiles) get the app tables and views;
+-- Row Level Security: anon gets nothing; linked staff accounts (staff.user_id) get the app tables and views;
 -- patient accounts get only their own rows of patient, booking, visit and prescription (end of this file).
 -- (Fine-grained per-staff-role policies can replace "authenticated_all" later.)
 REVOKE ALL ON ALL TABLES IN SCHEMA public FROM anon;
@@ -14,17 +14,35 @@ DECLARE t text;
 BEGIN
   FOR t IN SELECT tablename FROM pg_tables WHERE schemaname = 'public' LOOP
     EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', t);
-    IF t <> 'profiles' THEN
-      EXECUTE format('CREATE POLICY authenticated_all ON %I FOR ALL TO authenticated USING (is_app_user()) WITH CHECK (is_app_user())', t);
-    END IF;
+    EXECUTE format('CREATE POLICY authenticated_all ON %I FOR ALL TO authenticated USING (is_app_user()) WITH CHECK (is_app_user())', t);
   END LOOP;
 END $$;
 
--- A signed-in user may only READ their own profile row (roles are assigned by an admin, never self-service).
-CREATE POLICY own_profile ON profiles FOR SELECT TO authenticated
-  USING (user_id = auth.uid());
+-- ===== Who an account belongs to: only an admin may change it =====
+-- staff.user_id / patient.user_id link accounts, staff.role decides what a staff account may see, and staff.email is
+-- what a new staff account is matched on at sign-up. Other staff can still edit names, phones, departments, etc.
+-- The sign-up trigger, the SQL editor and service_role have no signed-in user, so they pass.
+CREATE FUNCTION trg_account_link_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE n jsonb := to_jsonb(NEW); o jsonb;
+BEGIN
+  IF no_signed_in_user() OR is_admin() THEN RETURN NEW; END IF;
+  IF TG_OP = 'INSERT' THEN
+    IF n->>'user_id' IS NOT NULL OR n->>'role' = 'admin' THEN
+      RAISE EXCEPTION 'only an admin may link an account or create an admin' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+  ELSE
+    o := to_jsonb(OLD);
+    IF n->'user_id' IS DISTINCT FROM o->'user_id' OR n->'role' IS DISTINCT FROM o->'role'
+       OR (TG_TABLE_NAME = 'staff' AND n->'email' IS DISTINCT FROM o->'email') THEN
+      RAISE EXCEPTION 'only an admin may change an account link, a staff role or a staff e-mail' USING ERRCODE = 'insufficient_privilege';
+    END IF;
+  END IF;
+  RETURN NEW;
+END $$;
+CREATE TRIGGER staff_account_link_guard   BEFORE INSERT OR UPDATE ON staff   FOR EACH ROW EXECUTE FUNCTION trg_account_link_guard();
+CREATE TRIGGER patient_account_link_guard BEFORE INSERT OR UPDATE ON patient FOR EACH ROW EXECUTE FUNCTION trg_account_link_guard();
 
--- ===== Patient accounts (profiles.role = 'patient', linked to one patient row) =====
+-- ===== Patient accounts (patient.user_id = the signed-in account) =====
 -- Policies are permissive, so these add to authenticated_all (staff/admin keep full access). A patient sees and changes
 -- only its own rows; the guards below limit WHICH columns it may change. Every other table stays closed to patients.
 CREATE POLICY patient_self_read   ON patient FOR SELECT TO authenticated USING (patient_id = my_patient_id());
@@ -44,9 +62,9 @@ CREATE FUNCTION trg_patient_self_update_guard() RETURNS trigger LANGUAGE plpgsql
 BEGIN
   IF NOT is_app_user() AND my_patient_id() IS NOT NULL
      AND (NEW.patient_id, NEW.hn, NEW.national_id, NEW.first_name, NEW.last_name, NEW.birth_date, NEW.gender,
-          NEW.blood_type, NEW.allergy_note, NEW.created_at)
+          NEW.blood_type, NEW.allergy_note, NEW.created_at, NEW.user_id)
      IS DISTINCT FROM (OLD.patient_id, OLD.hn, OLD.national_id, OLD.first_name, OLD.last_name, OLD.birth_date, OLD.gender,
-          OLD.blood_type, OLD.allergy_note, OLD.created_at) THEN
+          OLD.blood_type, OLD.allergy_note, OLD.created_at, OLD.user_id) THEN
     RAISE EXCEPTION 'a patient may change only phone, email and address' USING ERRCODE = 'insufficient_privilege';
   END IF;
   RETURN NEW;

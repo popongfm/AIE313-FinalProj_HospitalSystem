@@ -73,6 +73,7 @@ erDiagram
         varchar blood_type
         text allergy_note
         timestamptz created_at
+        uuid user_id FK
     }
     staff {
         int staff_id PK
@@ -83,6 +84,7 @@ erDiagram
         varchar license_no
         char phone
         varchar email
+        uuid user_id FK
     }
     department {
         int department_id PK
@@ -90,10 +92,10 @@ erDiagram
         varchar location
     }
     department |o--o{ staff : "department_id"
-    department |o--o{ room : "department_id"
-    room ||--o{ bed : "room_id"
     patient ||--o{ visit : "patient_id"
     staff |o--o{ visit : "staff_id"
+    department |o--o{ room : "department_id"
+    room ||--o{ bed : "room_id"
     visit ||--o{ admission : "visit_id"
     bed ||--o{ admission : "bed_id"
     visit ||--o{ diagnosis : "visit_id"

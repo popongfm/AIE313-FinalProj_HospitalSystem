@@ -16,6 +16,7 @@ erDiagram
         varchar license_no
         char phone
         varchar email
+        uuid user_id FK
     }
     patient {
         int patient_id PK
@@ -31,12 +32,7 @@ erDiagram
         varchar blood_type
         text allergy_note
         timestamptz created_at
-    }
-    profiles {
-        uuid user_id PK,FK
-        text role
-        int patient_id FK
-        int staff_id FK
+        uuid user_id FK
     }
     chat_logs {
         int chat_id PK
@@ -52,7 +48,6 @@ erDiagram
         uuid id PK
     }
     department |o--o{ staff : "department_id"
-    patient |o--o{ profiles : "patient_id"
-    staff |o--o{ profiles : "staff_id"
-    auth_users ||--o| profiles : "user_id"
+    auth_users ||--o| staff : "user_id"
+    auth_users ||--o| patient : "user_id"
     auth_users ||..o{ chat_logs : "user_id (no FK)"

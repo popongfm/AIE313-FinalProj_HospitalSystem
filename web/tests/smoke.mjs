@@ -22,8 +22,10 @@ const DB = { patient: [{ patient_id: 1, hn: 'HN1', national_id: '1100000000001',
   v_inventory_stock_status: [{ generic_name: 'Warfarin', lot_number: 'L1', quantity_on_hand: 20, reorder_point: 100, stock_status: 'REORDER_URGENT' }], booking: [],
   v_bed_occupancy: [{ department: 'อายุรกรรม', occupied_beds: 3, available_beds: 1 }, { department: 'อายุรกรรม', occupied_beds: 1, available_beds: 1 }, { department: null, occupied_beds: 0, available_beds: 2 }],
   v_pharmacist_screening_queue: [{ prescription_id: 1, prescription_status: 'Pending' }, { prescription_id: 1, prescription_status: 'Pending' }, { prescription_id: 2, prescription_status: 'Screened' }],
-  profiles: [{ user_id: 'u-admin', role: 'admin' }, { user_id: 'u-patient', role: 'patient', patient_id: 1 }, { user_id: 'u-pharm', role: 'pharmacist' }, { user_id: 'u-nurse', role: 'nurse' }], visit: [{ visit_id: 5, patient_id: 1, visit_type: 'OPD' }] };
+  visit: [{ visit_id: 5, patient_id: 1, visit_type: 'OPD' }] };
 const sess = () => JSON.parse(localStorage.getItem('mock_session') || 'null');
+// my_role(): what staff.user_id / patient.user_id say about the signed-in account (u-new: not linked yet)
+const ROLES = { 'u-admin': 'admin', 'u-patient': 'patient', 'u-pharm': 'pharmacist', 'u-nurse': 'nurse' };
 export function createClient() {
   const qb = (table) => { const st = { op: 'select', filters: [] };
     const b = { select() { return b; }, maybeSingle() { st.single = true; return b; }, order() { return b; }, limit() { return b; }, eq(k, v) { st.filters.push([k, v]); return b; },
@@ -38,12 +40,18 @@ export function createClient() {
     if (body.question.includes('ลบ')) return { data: { answer: '', sql: 'DELETE FROM patient', columns: [], rows: [], error: 'อนุญาตเฉพาะคำสั่ง SELECT เท่านั้น' }, error: null };
     if (body.question.includes('ว่าง')) return { data: { answer: 'ไม่พบข้อมูลที่ตรงกับคำถาม', sql: 'select 1', columns: [], rows: [], error: null }, error: null };
     return { data: { answer: 'มีแพทย์ 8 คน', sql: 'select count(*) as n from v_doctor_workload LIMIT 100', columns: ['n'], rows: [{ n: 8 }], error: null }, error: null }; };
-  const rpc = async (name) => ({ data: name === 'doctor_directory' ? [{ staff_id: 7, doctor_name: 'แพทย์ ทดสอบ', department: 'อายุรกรรม' }] : null, error: null });
+  const rpc = async (name) => {
+    if (name === 'my_role') { const s = sess(); return { data: (s && ROLES[s.user.id]) || null, error: null }; }
+    return { data: name === 'doctor_directory' ? [{ staff_id: 7, doctor_name: 'แพทย์ ทดสอบ', department: 'อายุรกรรม' }] : null, error: null }; };
   return { from: qb, rpc, functions: { invoke }, auth: {
     async signInWithPassword({ email, password }) { if (password !== 'secret1') return { error: { message: 'Invalid login credentials' } };
       localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'new@b.th' ? 'u-new' : email === 'pt@b.th' ? 'u-patient' : email === 'ph@b.th' ? 'u-pharm' : email === 'ns@b.th' ? 'u-nurse' : 'u-admin' } })); return { error: null }; },
-    async signUp({ email }) { window.__signups = (window.__signups || 0) + 1;
+    async signUp({ email, options }) { window.__signups = (window.__signups || 0) + 1; window.__signupData = options && options.data;
       if (email === 'a@b.th') return { data: { user: { identities: [] }, session: null }, error: null };   // existing e-mail, confirm-email on
+      if (email === 'dup@b.th') return { data: null, error: { message: 'Database error saving new user' } };   // trigger refused the patient data
+      // confirm-email off: signed in at once; pt2 is linked by the trigger, stranger is a staff e-mail nobody added
+      if (email === 'pt2@b.th' || email === 'stranger@b.th') { localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'pt2@b.th' ? 'u-patient' : 'u-new' } }));
+        return { data: { user: { identities: [{}] }, session: {} }, error: null }; }
       return { data: { user: { identities: [{}] }, session: null }, error: null }; },
     async signOut() { localStorage.removeItem('mock_session'); },
     async getSession() { return { data: { session: sess() } }; } } };
@@ -63,17 +71,42 @@ await check('wrong password shows Thai error', async () => {
   await page.fill('#email', 'a@b.th'); await page.fill('#password', 'wrongpw'); await page.click('#login');
   await page.waitForFunction(() => document.getElementById('err').textContent.length > 0);
   assert.equal(await page.textContent('#err'), 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'); });
-await check('sign-up with an existing e-mail shows Thai duplicate message', async () => {
-  await page.fill('#email', 'a@b.th'); await page.fill('#password', 'secret1'); await page.click('#signup');
+await check('login page links to the separate registration page', async () => {
+  assert.equal(await page.getAttribute('#signup', 'href'), 'register.html'); });
+const fillPatient = async (email, extra = {}) => {
+  await page.goto(base + '/register.html');
+  const f = { first_name: 'มานี', last_name: 'มีนา', national_id: '1234567890123', birth_date: '2000-01-31', email, password: 'secret1', password2: 'secret1', ...extra };
+  for (const [k, v] of Object.entries(f)) await page.fill('#' + k, v); };
+await check('register: patient sign-up sends the data the database trigger needs', async () => {
+  await fillPatient('new@b.th', { phone: '0812345678' }); await page.click('#submit');
+  await page.waitForFunction(() => document.getElementById('ok').textContent.includes('ยืนยันอีเมล'));
+  assert.deepEqual(await page.evaluate(() => window.__signupData), { account_type: 'patient', first_name: 'มานี', last_name: 'มีนา', national_id: '1234567890123', birth_date: '2000-01-31', phone: '0812345678' });
+  assert.ok(page.url().endsWith('/register.html')); });
+await check('register: existing e-mail shows Thai duplicate message', async () => {
+  await fillPatient('a@b.th'); await page.click('#submit');
   await page.waitForFunction(() => document.getElementById('err').textContent.length > 0);
   assert.equal(await page.textContent('#err'), 'อีเมลนี้ถูกใช้สมัครแล้ว'); assert.equal(await page.textContent('#ok'), ''); });
-await check('sign-up with a new e-mail stays on the page and says to wait for approval', async () => {
-  await page.fill('#email', 'new@b.th'); await page.click('#signup');
-  await page.waitForFunction(() => document.getElementById('ok').textContent.includes('ผู้ดูแลระบบอนุมัติ'));
-  assert.equal(await page.textContent('#err'), ''); assert.ok(page.url().endsWith('/index.html')); });
-await check('sign-up with a too-short password is blocked before calling Supabase', async () => {
-  const before = await page.evaluate(() => window.__signups); await page.fill('#password', '123'); await page.click('#signup');
-  assert.equal(await page.evaluate(() => window.__signups), before); });
+await check('register: refused patient data (trigger) shows a Thai explanation', async () => {
+  await fillPatient('dup@b.th'); await page.click('#submit');
+  await page.waitForFunction(() => document.getElementById('err').textContent.includes('เลขบัตรประชาชน')); });
+await check('register: bad national ID / mismatched passwords are blocked before calling Supabase', async () => {
+  // fillPatient loads a fresh page, so the mock's sign-up counter starts at 0 each time
+  await fillPatient('x@b.th', { national_id: '12345' }); await page.click('#submit');
+  assert.equal(await page.textContent('#err'), 'เลขบัตรประชาชนต้องเป็นตัวเลข 13 หลัก');
+  assert.equal(await page.evaluate(() => window.__signups || 0), 0);
+  await fillPatient('x@b.th', { password2: 'other12' }); await page.click('#submit');
+  assert.equal(await page.textContent('#err'), 'รหัสผ่านทั้งสองช่องไม่ตรงกัน');
+  assert.equal(await page.evaluate(() => window.__signups || 0), 0); });
+await check('register: staff sign-up hides patient fields and sends only the account type', async () => {
+  await page.goto(base + '/register.html'); await page.check('input[value=staff]');
+  assert.equal(await page.isVisible('#national_id'), false); assert.equal(await page.isVisible('#staff-hint'), true);
+  await page.fill('#email', 'stranger@b.th'); await page.fill('#password', 'secret1'); await page.fill('#password2', 'secret1'); await page.click('#submit');
+  await page.waitForFunction(() => document.getElementById('ok').textContent.includes('รายชื่อเจ้าหน้าที่'));
+  assert.deepEqual(await page.evaluate(() => window.__signupData), { account_type: 'staff' });
+  assert.equal(await page.evaluate(() => localStorage.getItem('mock_session')), null, 'unlinked account is signed out'); });
+await check('register: an account the trigger linked goes straight into the app', async () => {
+  await fillPatient('pt2@b.th'); await page.click('#submit'); await page.waitForURL('**/app.html');
+  await page.evaluate(() => localStorage.removeItem('mock_session')); await page.goto(base + '/index.html'); });
 await check('correct password reaches app (approved account, no pending notice)', async () => {
   await page.fill('#email', 'a@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html'); await page.waitForSelector('#panel table');
   assert.equal(await page.locator('#pending').count(), 0); });
@@ -120,10 +153,10 @@ await check('app.html#chat opens the Chat tab; an unknown hash like #constructor
   await page.waitForFunction(() => document.getElementById('page-title').textContent === 'ผู้ช่วย AI');
   await page.goto('about:blank'); await page.goto(base + '/app.html#constructor');
   await page.waitForSelector('#panel table'); assert.equal(await page.textContent('#page-title'), 'ข้อมูลในระบบ'); });
-await check('account without an approved profile sees the pending notice', async () => {
+await check('account not linked yet sees the pending notice', async () => {
   await page.click('#logout'); await page.waitForURL('**/index.html');
   await page.fill('#email', 'new@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html');
-  await page.waitForSelector('#pending'); assert.ok((await page.textContent('#pending')).includes('ยังไม่ได้รับสิทธิ์')); });
+  await page.waitForSelector('#pending'); assert.ok((await page.textContent('#pending')).includes('ยังไม่ได้ผูก')); });
 await check('patient account: own-record tables only, book with a doctor list, no add/edit on read-only tables', async () => {
   await page.goto(base + '/index.html'); await page.evaluate(() => localStorage.removeItem('mock_session')); await page.goto(base + '/index.html');
   await page.fill('#email', 'pt@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html*');

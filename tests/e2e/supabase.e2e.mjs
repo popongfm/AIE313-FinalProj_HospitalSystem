@@ -55,11 +55,16 @@ const STAFF = { doctor: idOf("select min(staff_id) from staff where role='doctor
   nurse: idOf("select min(staff_id) from staff where role='nurse'"), pharmacist2: idOf("select max(staff_id) from staff where role='pharmacist'") };
 const PATIENT_COUNT = sql('select count(*) from patient');
 
-async function makeUser(tag, profile) {
+// link = { patient_id } | { staff_id } | { admin: true }: set the user_id foreign key the way an admin would in the
+// SQL editor (accounts live in patient.user_id / staff.user_id; there is no profiles table)
+async function makeUser(tag, link) {
   const email = `${tag}${t}@example.test`;
   const c = await admin.auth.admin.createUser({ email, password: 'secret123', email_confirm: true });
   if (c.error) throw new Error(`${tag}: ${c.error.message}`);
-  if (profile) { const r = await admin.from('profiles').insert({ user_id: c.data.user.id, ...profile }); if (r.error) throw new Error(`${tag}: ${r.error.message}`); }
+  const uid = c.data.user.id;
+  if (link?.patient_id) sql(`update patient set user_id = '${uid}' where patient_id = ${link.patient_id}`);
+  if (link?.staff_id) sql(`update staff set user_id = '${uid}' where staff_id = ${link.staff_id}`);
+  if (link?.admin) sql(`insert into staff(first_name, last_name, role, user_id) values ('e2e', 'admin', 'admin', '${uid}')`);
   const sb = fresh(); const s = await sb.auth.signInWithPassword({ email, password: 'secret123' });
   if (s.error) throw new Error(`${tag}: ${s.error.message}`);
   return { sb, id: c.data.user.id, token: s.data.session.access_token };
@@ -73,11 +78,11 @@ const U = { anon: { sb: fresh(), id: null, token: ANON } };
 const PID = idOf(`select min(v.patient_id) from prescription pr join visit v using (visit_id)
   where pr.status in ('Pending','Screened') and v.patient_id in (select patient_id from booking where booking_date = current_date)`);
 const PHN = sql(`select hn from patient where patient_id = ${PID}`);
-U.patient = await makeUser('patient', { role: 'patient', patient_id: PID });
-U.nurse = await makeUser('nurse', { role: 'nurse', staff_id: STAFF.nurse });
-U.doctor = await makeUser('doctor', { role: 'doctor', staff_id: STAFF.doctor });
-U.pharmacist = await makeUser('pharm', { role: 'pharmacist', staff_id: STAFF.pharmacist });
-U.admin = await makeUser('admin', { role: 'admin' });
+U.patient = await makeUser('patient', { patient_id: PID });
+U.nurse = await makeUser('nurse', { staff_id: STAFF.nurse });
+U.doctor = await makeUser('doctor', { staff_id: STAFF.doctor });
+U.pharmacist = await makeUser('pharm', { staff_id: STAFF.pharmacist });
+U.admin = await makeUser('admin', { admin: true });
 
 const TABLES = ['department', 'staff', 'patient', 'room', 'bed', 'visit', 'admission', 'diagnosis', 'lab_result', 'insurance_coverage', 'daily_charge',
   'booking', 'feedback', 'drug', 'drug_lot', 'prescription', 'prescription_item', 'dispense_record', 'inventory', 'drug_allergy_record'];
@@ -127,17 +132,30 @@ for (const who of ['none', 'patient']) {
   check(C, 'pharmacist: เพิ่มคนไข้ใหม่', 'สำเร็จ id ไม่ชนกับ seed', ins.error?.message ?? `patient_id=${ins.data[0].patient_id}`, !ins.error && ins.data[0].patient_id >= maxSeed);
   const del = ins.data ? await sb.from('patient').delete().eq('patient_id', ins.data[0].patient_id).select() : { error: { message: 'insert failed' } };
   check(C, 'pharmacist: ลบคนไข้ที่ยังไม่มี visit', 'สำเร็จ', del.error?.message ?? `${del.data.length} แถว`, !del.error && del.data.length === 1); }
-{ const r = await U.none.sb.from('profiles').insert({ user_id: U.none.id, role: 'admin' }).select();
-  check(C, 'none: สร้าง profile admin ให้ตัวเอง', 'ถูกปฏิเสธ', r.error?.code ?? 'สร้างได้!', !!r.error && sql(`select count(*) from profiles where user_id='${U.none.id}'`) === '0'); }
-for (const who of ['patient', 'pharmacist']) {
-  const r = await U[who].sb.from('profiles').update({ role: 'admin', patient_id: null, staff_id: null }).eq('user_id', U[who].id).select();
-  const role = sql(`select role from profiles where user_id='${U[who].id}'`);
-  check(C, `${who}: เปลี่ยน role ตัวเองเป็น admin`, 'ไม่เปลี่ยน', `${r.error?.code ?? `${r.data.length} แถว`}, role=${role}`, role === who); }
-{ const r = await U.pharmacist.sb.from('profiles').select('user_id');
-  check(C, 'pharmacist: อ่าน profiles ของคนอื่น', 'เห็นแค่ของตัวเอง', `${r.data?.length} แถว`, r.data?.length === 1 && r.data[0].user_id === U.pharmacist.id);
-  await U.admin.sb.from('profiles').delete().eq('user_id', U.pharmacist.id);
-  check(C, 'admin: ลบ profile คนอื่นผ่าน API', 'ลบไม่ได้', `เหลือ ${sql(`select count(*) from profiles where user_id='${U.pharmacist.id}'`)} แถว`,
-    sql(`select count(*) from profiles where user_id='${U.pharmacist.id}'`) === '1'); }
+{ const r = await U.none.sb.from('staff').insert({ first_name: 'x', last_name: 'y', role: 'admin', user_id: U.none.id }).select();
+  check(C, 'none: สร้างแถว staff admin ให้ตัวเอง', 'ถูกปฏิเสธ', r.error?.code ?? 'สร้างได้!', !!r.error && sql(`select count(*) from staff where user_id='${U.none.id}'`) === '0'); }
+for (const [who, table] of [['patient', 'patient'], ['pharmacist', 'staff']]) {
+  const r = await U[who].sb.from(table).update(table === 'staff' ? { role: 'admin' } : { user_id: null }).eq('user_id', U[who].id).select();
+  const role = (await admin.rpc('role_of', { uid: U[who].id })).data;
+  check(C, `${who}: เปลี่ยน role / ตัดการผูกบัญชีตัวเอง`, 'ไม่เปลี่ยน', `${r.error?.code ?? `${r.data.length} แถว`}, role=${role}`, role === who); }
+{ const r = await U.pharmacist.sb.from('staff').update({ email: `steal${t}@example.test` }).eq('staff_id', STAFF.doctor).select();
+  check(C, 'pharmacist: แก้อีเมลของแพทย์ (เพื่อสมัครแทน)', 'ถูกปฏิเสธ 42501', r.error?.code ?? 'แก้ได้!', r.error?.code === '42501'); }
+{ const r = await U.admin.sb.from('staff').update({ role: 'nurse' }).eq('staff_id', STAFF.pharmacist2).select();
+  check(C, 'admin: เปลี่ยน role ของเจ้าหน้าที่', 'สำเร็จ', r.error?.message ?? `${r.data.length} แถว`, !r.error && r.data.length === 1);
+  sql(`update staff set role = 'pharmacist' where staff_id = ${STAFF.pharmacist2}`); }
+// sign-up trigger through the real Auth server: a new patient gets a record, a staff e-mail gets its staff row
+{ const nid = String(t).slice(-13).padStart(13, '8');
+  const sb = fresh(); const s = await sb.auth.signUp({ email: `newpt${t}@example.test`, password: 'secret123',
+    options: { data: { account_type: 'patient', first_name: 'ใหม่', last_name: 'สมัครเอง', national_id: nid, birth_date: '2001-02-03' } } });
+  const role = s.data?.user ? (await admin.rpc('role_of', { uid: s.data.user.id })).data : null;
+  check(C, 'สมัครเป็นผู้ป่วยใหม่ (trigger)', 'ได้ HN ใหม่และผูกบัญชีแล้ว', s.error?.message ?? `role=${role} hn=${sql(`select hn from patient where national_id='${nid}'`)}`, !s.error && role === 'patient');
+  const dup = await fresh().auth.signUp({ email: `dup${t}@example.test`, password: 'secret123',
+    options: { data: { account_type: 'patient', first_name: 'a', last_name: 'b', national_id: nid, birth_date: '1990-01-01' } } });
+  check(C, 'สมัครด้วยเลขบัตรที่มีบัญชีแล้ว', 'ถูกปฏิเสธ ไม่สร้างบัญชี', dup.error?.message ?? 'สมัครได้!', !!dup.error && sql(`select count(*) from auth.users where email='dup${t}@example.test'`) === '0');
+  const mail = `nurse.new${t}@example.test`; sql(`insert into staff(first_name, last_name, role, email) values ('พยาบาล', 'ใหม่', 'nurse', '${mail}')`);
+  const st = await fresh().auth.signUp({ email: mail, password: 'secret123', options: { data: { account_type: 'staff' } } });
+  const srole = st.data?.user ? (await admin.rpc('role_of', { uid: st.data.user.id })).data : null;
+  check(C, 'สมัครเป็นเจ้าหน้าที่ด้วยอีเมลที่ admin เตรียมไว้', 'ผูกกับ staff role=nurse', st.error?.message ?? `role=${srole}`, srole === 'nurse'); }
 { const spoof = await U.none.sb.from('chat_logs').insert({ user_id: U.pharmacist.id, question: 'spoof' }).select();
   check(C, 'none: เขียน chat_logs ในชื่อคนอื่น', 'ถูกปฏิเสธ 42501', spoof.error?.code ?? 'เขียนได้!', spoof.error?.code === '42501');
   const rd = await U.pharmacist.sb.from('chat_logs').select('user_id');
@@ -155,7 +173,7 @@ for (const [name, tok] of [
   ['JWT alg=none role service_role', mint({ role: 'service_role', exp: 2e9 }, null, 'none')],
   ['JWT ของ admin ที่หมดอายุ', mint({ role: 'authenticated', sub: U.admin.id, aud: 'authenticated', exp: Math.floor(t / 1000) - 60 }, SECRET)],
 ]) { const r = await rest(tok); check(C, name, 'REST ปฏิเสธ (401)', r.status, r.status === 401); }
-{ const victim = await makeUser('deleted', { role: 'pharmacist', staff_id: STAFF.pharmacist2 });
+{ const victim = await makeUser('deleted', { staff_id: STAFF.pharmacist2 });   // deleting the account sets staff.user_id back to NULL
   await admin.auth.admin.deleteUser(victim.id);
   const r = await rest(victim.token); const n = r.status === 200 ? (await r.json()).length : r.status;
   check(C, 'token เก่าของบัญชีที่ถูกลบ: อ่าน patient', 'ไม่เห็นข้อมูล', `HTTP ${r.status}, ${n}`, r.status !== 200 || n === 0);

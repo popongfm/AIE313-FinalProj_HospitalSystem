@@ -15,7 +15,7 @@ export const TABLES = {
   inventory: { label: 'สต็อกยา', pk: 'inventory_id', cols: [n('drug_id', 'รหัสยา', true), n('lot_id', 'รหัส lot', true), t('location', 'ตำแหน่งเก็บ', true), n('quantity_on_hand', 'จำนวนคงเหลือ', true), n('reorder_point', 'จุดสั่งซื้อ')] },
 };
 
-// Patient accounts (profiles.role = 'patient'): only their own rows come back from the database (RLS in 06_rls.sql).
+// Patient accounts (patient.user_id = the account): only their own rows come back from the database (RLS in 06_rls.sql).
 // insert/edit/remove say which buttons to show; the database allows exactly these and nothing more.
 export const PATIENT_TABLES = {
   patient: { label: 'ข้อมูลของฉัน', pk: 'patient_id', insert: false, remove: false,   // edit = contact details only

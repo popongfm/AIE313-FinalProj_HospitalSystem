@@ -21,10 +21,15 @@ Status legend: **mock** = verified automatically against a mocked Supabase clien
 | V1 | Open each of the 10 views | Table (or "ไม่พบข้อมูล" when empty) | v_top_diagnosis / v_feedback_summary checked | mock PASS (2/9) |
 | D1 | Open Dashboard as admin / doctor / nurse / pharmacist | admin 5 charts D1–D5; doctor D1 D4; nurse D4 D1; pharmacist D5 D3 | admin 5, nurse D4 D1 (D4 failing does not block D1), pharmacist D5 D3 | mock PASS (admin, nurse, pharmacist) |
 | S1 | Call `/rest/v1/patient` with the anon key, no session | HTTP 401 / permission denied, no rows | RLS tested in `db/tests/70_rls.sql` | DB PASS, HTTP todo |
-| S2 | Signed in as an unapproved account (no profile), open each of the 10 views | Every view returns 0 rows (no HN, names or allergies) | 0 rows in all 10 views (`db/tests/70_rls.sql`) | DB PASS, HTTP todo |
+| S2 | Signed in as a staff sign-up whose e-mail is not in `staff` (not linked), open each of the 10 views | Every view returns 0 rows (no HN, names or allergies) | 0 rows in all 10 views (`db/tests/70_rls.sql`) | DB PASS, HTTP todo |
 | S3 | Signed in as an unapproved account, ask any Chat question | HTTP 403, message "บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ" | | todo |
-| S4 | Admin links the account (`INSERT INTO profiles ...`), user reloads | Notice disappears; tables, views and Chat work | | todo |
-| P1 | Patient account (`role = 'patient'`): open "ข้อมูล" | Title "ข้อมูลของฉัน"; only 4 tables (patient, booking, visit, prescription), each showing only the patient's own rows | Own rows only (`db/tests/70_rls.sql`, e2e A) | mock PASS, DB PASS, todo |
+| S4 | Admin adds a `staff` row with that account's e-mail, user signs in again | Account linked by trigger `staff_link_waiting_account`; notice disappears; tables, views and Chat work | Linked (`db/tests/72_signup_trigger.sql`) | DB PASS, todo |
+| R1 | `register.html`: sign up as ผู้ป่วย with a new national ID + birth date | New `patient` row with the next HN, linked; goes straight to "ข้อมูลของฉัน" (confirm-email off) | `db/tests/72_signup_trigger.sql`, smoke | DB PASS, mock PASS, todo |
+| R2 | Sign up as ผู้ป่วย with the national ID + birth date of an existing record | Linked to the existing record (same HN), no new row | `db/tests/72_signup_trigger.sql` | DB PASS, todo |
+| R3 | Sign up as ผู้ป่วย with a national ID that already has an account, or a wrong birth date | Sign-up refused, no account created; Thai message about the national ID | DB + smoke | DB PASS, mock PASS, todo |
+| R4 | Sign up as เจ้าหน้าที่ with `staff3@hospital.example` (seed) | Linked to that staff row, role doctor; sign up with an unknown e-mail: waits, sees nothing | `db/tests/72_signup_trigger.sql` | DB PASS, todo |
+| R5 | Nurse tries to set its own `staff.role = 'admin'` or change a doctor's e-mail | Refused ("ไม่มีสิทธิ์") | `db/tests/70_rls.sql` | DB PASS, todo |
+| P1 | Patient account (`patient.user_id` linked): open "ข้อมูล" | Title "ข้อมูลของฉัน"; only 4 tables (patient, booking, visit, prescription), each showing only the patient's own rows | Own rows only (`db/tests/70_rls.sql`, e2e A) | mock PASS, DB PASS, todo |
 | P2 | Patient: "+ จองคิว", choose a doctor, date, time | Booking created with the next queue number, status pending; a past date is refused | | mock PASS, DB PASS, todo |
 | P3 | Patient: "ยกเลิกคิว" on a pending booking | Status becomes cancelled; changing time or deleting is refused | | DB PASS, todo |
 | P4 | Patient: edit own phone / email / address; try to change name or allergy note | Contact details saved; other fields refused ("ไม่มีสิทธิ์ใช้งาน") | | DB PASS, todo |

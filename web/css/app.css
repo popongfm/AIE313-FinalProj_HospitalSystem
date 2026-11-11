@@ -97,7 +97,7 @@ button[data-armed="1"] { border-color: var(--danger); color: var(--danger); back
 .hero-card { position: relative; z-index: 1; color: var(--ink); background: var(--paper); border-radius: 12px; padding: 30px; box-shadow: 0 40px 80px -36px rgba(0, 0, 0, .65), 0 0 0 1px rgba(255, 255, 255, .06); }
 .hero-card h2 { font-size: 22px; margin-bottom: 4px; }
 .hero-card .row { margin: 4px 0 0; }
-.hero-card button { flex: 1; padding-top: 11px; padding-bottom: 11px; }
+.hero-card button, .hero-card .row > .btn { flex: 1; padding-top: 11px; padding-bottom: 11px; }
 .you-are-here { position: absolute; z-index: 2; top: -15px; left: 26px; display: inline-flex; align-items: center; gap: 8px; padding: 3px 12px 3px 8px;
   border-radius: 999px; background: var(--mint); color: var(--mint-ink); font-size: 14px; font-weight: 600; box-shadow: 0 6px 16px -6px rgba(0, 0, 0, .5); }
 .you-are-here::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--mint-ink); box-shadow: 0 0 0 3px rgba(5, 38, 31, .2); }
@@ -262,3 +262,23 @@ pre { overflow-x: auto; background: var(--mist); border: 1px solid var(--line); 
   .msg { max-width: 92%; }
   .charts { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* Registration page (register.html) */
+.register { padding-top: 40px; padding-bottom: 64px; }
+.site-bar .push-right { margin-left: auto; }
+.reg-card { max-width: 640px; margin: 0 auto; background: var(--paper); border-radius: 12px; padding: 32px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+.reg-card h1 { font-size: 28px; margin-bottom: 4px; }
+.reg-card .lead { color: var(--muted); margin: 0 0 20px; }
+.reg-card .row { margin: 16px 0 0; }
+.account-type { border: 0; padding: 0; margin: 0 0 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.account-type legend { color: var(--muted); font-size: 14px; font-weight: 500; margin-bottom: 6px; padding: 0; }
+.account-type label { margin: 0; cursor: pointer; }
+.account-type input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.account-type span { display: block; height: 100%; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; color: var(--ink); background: var(--paper); }
+.account-type strong { display: block; font-size: 16px; }
+.account-type small { display: block; color: var(--muted); font-weight: 400; }
+.account-type input:checked + span { border-color: var(--scrub); background: var(--scrub-soft); box-shadow: inset 0 0 0 1px var(--scrub); }
+.account-type input:focus-visible + span { outline: 3px solid var(--scrub); outline-offset: 2px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
+.grid2 .full { grid-column: 1 / -1; }
+@media (max-width: 560px) { .reg-card { padding: 22px; } .grid2, .account-type { grid-template-columns: 1fr; } }

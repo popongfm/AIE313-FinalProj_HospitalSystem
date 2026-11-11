@@ -20,10 +20,11 @@ Deno.serve(async (req) => {
   const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '');
   const { data: auth } = await admin.auth.getUser(token);
   if (!auth?.user) return json({ error: 'กรุณาเข้าสู่ระบบก่อนใช้งาน' }, 401);
-  // Signed in is not enough: the account must be linked to a profile by an admin. Staff/admin see every row; a patient
+  // Signed in is not enough: the account must be linked to a staff or patient row. Staff/admin see every row; a patient
   // sees only its own rows, because run_readonly_query applies the views' access rule for the user passed as as_user.
-  const { data: prof } = await admin.from('profiles').select('role').eq('user_id', auth.user.id).maybeSingle();
-  if (!prof) return json({ error: 'บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, 403);
+  // role_of(): staff.role or 'patient' from the user_id link in staff / patient; null = not linked yet
+  const { data: role } = await admin.rpc('role_of', { uid: auth.user.id });
+  if (!role) return json({ error: 'บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน กรุณาติดต่อผู้ดูแลระบบ' }, 403);
 
   let question = '';
   try { question = (await req.json()).question; } catch { /* handled below as empty question */ }
