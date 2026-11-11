@@ -337,7 +337,7 @@ pre { overflow-x: auto; background: var(--paper); border: 1px solid var(--line);
 
 @media (max-width: 720px) {
   .app-bar { padding: 8px 16px 0; gap: 4px 12px; }
-  .app-bar nav { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; justify-content: space-between; }
+  .app-bar nav { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; justify-content: flex-start; gap: 8px; }
   .app-bar nav button { white-space: nowrap; padding: 10px 6px; font-size: 14px; gap: 6px; }
   .app-bar nav .icon { width: 16px; height: 16px; }
   .role-chip { display: none; }
