@@ -51,7 +51,8 @@ function bubble(entry, actions) {
   if (entry.role === 'user') { div.textContent = entry.text; return div; }
   if (entry.pending) { div.textContent = 'กำลังประมวลผล…'; return div; }
   if (entry.error) { const e = document.createElement('div'); e.className = 'err'; e.textContent = entry.error; div.appendChild(e); }
-  if (entry.answer) { const p = document.createElement('div'); p.textContent = entry.answer; div.appendChild(p); }
+  // answers are plain text (textContent, never HTML); drop Markdown bold/heading marks a model may still add
+  if (entry.answer) { const p = document.createElement('div'); p.className = 'answer'; p.textContent = String(entry.answer).replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,6}\s+/gm, ''); div.appendChild(p); }
   if (!entry.error && entry.action && entry.action.type === 'book_appointment') div.appendChild(bookingCard(entry, () => actions.confirm(entry), () => actions.cancel(entry)));
   if (entry.sql) {                                   // evidence: the SQL that was (or would have been) run
     const d = document.createElement('details'); const s = document.createElement('summary'); s.textContent = 'SQL ที่ใช้';

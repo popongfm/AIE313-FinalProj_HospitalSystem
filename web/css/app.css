@@ -298,3 +298,5 @@ pre { overflow-x: auto; background: var(--mist); border: 1px solid var(--line); 
 .utility .tz-badge { color: var(--on-deep); font-size: 14px; }
 .utility .tz-badge small { font-size: inherit; margin-left: 6px; }
 @media (max-width: 720px) { .app-bar .tz-badge { align-items: flex-start; } }
+
+.msg .answer { white-space: pre-line; }   /* keep the model's line breaks (lists) */
