@@ -41,6 +41,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE result json; caller text := current_setting('request.jwt.claim.sub', true);
 BEGIN
   PERFORM set_config('request.jwt.claim.sub', coalesce(as_user::text, ''), true);   -- only for this query
+  PERFORM set_config('timezone', 'Asia/Bangkok', true);   -- CURRENT_DATE / now() in the model's SQL = Thai time (GMT+7)
   EXECUTE format('SELECT coalesce(json_agg(t), ''[]''::json) FROM (%s) t', q) INTO result;
   PERFORM set_config('request.jwt.claim.sub', coalesce(caller, ''), true);
   RETURN result;

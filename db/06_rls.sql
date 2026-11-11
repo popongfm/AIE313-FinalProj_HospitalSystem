@@ -93,7 +93,7 @@ BEGIN
   IF is_app_user() OR me IS NULL THEN RETURN NEW; END IF;
   IF TG_OP = 'INSERT' THEN
     NEW.patient_id := coalesce(NEW.patient_id, me);
-    IF NEW.booking_date < CURRENT_DATE THEN
+    IF NEW.booking_date < hospital_today() THEN   -- Thai date (GMT+7)
       RAISE EXCEPTION 'booking date is in the past' USING ERRCODE = 'check_violation';
     END IF;
     NEW.queue_no := (SELECT coalesce(max(queue_no), 0) + 1 FROM booking WHERE staff_id = NEW.staff_id AND booking_date = NEW.booking_date);

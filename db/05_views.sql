@@ -14,7 +14,7 @@ FROM booking b
 JOIN patient p ON p.patient_id = b.patient_id
 JOIN staff s ON s.staff_id = b.staff_id
 LEFT JOIN department d ON d.department_id = s.department_id
-WHERE b.booking_date = CURRENT_DATE AND ((current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user()) OR is_app_user() OR p.patient_id = my_patient_id())
+WHERE b.booking_date = hospital_today() AND ((current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user()) OR is_app_user() OR p.patient_id = my_patient_id())
 ORDER BY s.staff_id, b.queue_no;
 
 -- Upcoming appointments from today on, every status ("what appointments do I have?"); one row per patient booking.
@@ -25,7 +25,7 @@ FROM booking b
 JOIN patient p ON p.patient_id = b.patient_id
 JOIN staff s ON s.staff_id = b.staff_id
 LEFT JOIN department d ON d.department_id = s.department_id
-WHERE b.booking_date >= CURRENT_DATE AND ((current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user()) OR is_app_user() OR p.patient_id = my_patient_id())
+WHERE b.booking_date >= hospital_today() AND ((current_user NOT IN ('anon', 'authenticated') AND no_signed_in_user()) OR is_app_user() OR p.patient_id = my_patient_id())
 ORDER BY b.booking_date, b.booking_time, s.staff_id;
 
 CREATE VIEW v_doctor_workload AS
@@ -97,7 +97,7 @@ CREATE VIEW v_inventory_stock_status AS
 SELECT inv.inventory_id, d.generic_name, d.trade_name, l.lot_number, l.expiry_date, inv.location,
        inv.quantity_on_hand, inv.reorder_point,
        CASE WHEN inv.quantity_on_hand <= inv.reorder_point THEN 'REORDER_URGENT'
-            WHEN l.expiry_date <= CURRENT_DATE + 90 THEN 'NEAR_EXPIRY'
+            WHEN l.expiry_date <= hospital_today() + 90 THEN 'NEAR_EXPIRY'
             ELSE 'NORMAL' END AS stock_status
 FROM inventory inv
 JOIN drug d ON d.drug_id = inv.drug_id

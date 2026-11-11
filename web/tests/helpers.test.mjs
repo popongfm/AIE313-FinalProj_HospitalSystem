@@ -52,3 +52,27 @@ test('countDistinctBy counts each id once per group', () => {
   assert.deepEqual(countDistinctBy(rows, 's', 'id'), [{ key: 'Pending', count: 2 }, { key: 'Screened', count: 1 }]);
   assert.deepEqual(countDistinctBy([], 's', 'id'), []);
 });
+
+// ---------- Thailand time (Asia/Bangkok, GMT+7) ----------
+import { bangkokDate, formatTimestamp, toDatetimeLocal, fromDatetimeLocal, TZ_LABEL } from '../js/helpers.js';
+test('bangkokDate: the Thai date, not the browser/UTC date', () => {
+  assert.equal(bangkokDate(new Date('2026-11-11T18:30:00Z')), '2026-11-12');   // 01:30 in Bangkok
+  assert.equal(bangkokDate(new Date('2026-11-11T16:59:00Z')), '2026-11-11');   // 23:59 in Bangkok
+  assert.match(TZ_LABEL, /Asia\/Bangkok/); assert.match(TZ_LABEL, /GMT\+7/);
+});
+test('formatTimestamp: API timestamps shown in Thai time; dates, times and text untouched', () => {
+  assert.equal(formatTimestamp('2026-11-10T03:00:00+00:00'), '2026-11-10 10:00');
+  assert.equal(formatTimestamp('2026-11-10 10:00:00+07'), '2026-11-10 10:00');
+  assert.equal(formatTimestamp('2026-11-10T20:15:30.123456+00:00'), '2026-11-11 03:15');
+  for (const v of ['2026-11-10', '10:00:00', 'HN0001', 42, null]) assert.equal(formatTimestamp(v), v);
+});
+test('datetime-local: shown as Thai wall-clock time, saved with +07:00', () => {
+  assert.equal(toDatetimeLocal('2026-11-10T03:00:00+00:00'), '2026-11-10T10:00');
+  assert.equal(toDatetimeLocal(null), '');
+  assert.equal(fromDatetimeLocal('2026-11-10T10:00'), '2026-11-10T10:00:00+07:00');
+  const { row } = coerceRow({ cols: [{ name: 'admit_date', type: 'datetime-local', required: true }] }, { admit_date: '2026-11-10T10:00' });
+  assert.equal(row.admit_date, '2026-11-10T10:00:00+07:00');
+});
+test('tableModel shows timestamptz cells in Thai time', () => {
+  assert.deepEqual(tableModel([{ created_at: '2026-11-10T03:00:00+00:00', booking_date: '2026-11-10' }]).rows, [['2026-11-10 10:00', '2026-11-10']]);
+});

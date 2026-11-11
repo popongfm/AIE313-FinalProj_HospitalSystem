@@ -36,7 +36,12 @@ export function createClient() {
         if (st.op === 'insert') { DB[table] = [...(DB[table] || []), st.row]; return res({ data: null, error: null }); }
         let rows = DB[table] || []; st.filters.forEach(([k, v]) => { rows = rows.filter((r) => r[k] === v); }); res({ data: st.single ? (rows[0] || null) : rows, error: null }); } };
     return b; };
-  const invoke = async (name, { body }) => { await new Promise((r) => setTimeout(r, 300));
+  const BOOK = { hn: 'HN0001', patient_name: 'อนันต์ ใจดี', staff_id: 7, doctor_name: 'แพทย์ ทดสอบ', department: 'อายุรกรรม', booking_date: '2026-11-20', booking_time: '10:00', queue_no: 3 };
+  const invoke = async (name, { body }) => { await new Promise((r) => setTimeout(r, 300)); (window.__chatBodies = window.__chatBodies || []).push(body);
+    if (body.confirm_booking) return { data: { answer: 'บันทึกนัดแล้ว: แพทย์ ทดสอบ วันที่ 2026-11-20 เวลา 10:00 น. คิวที่ 3 (HN HN0001)', sql: '-- chat_book_appointment', columns: Object.keys(BOOK), rows: [{ ...BOOK, booking_id: 9 }], error: null }, error: null };
+    if (body.question.includes('ขอนัด')) return { data: { answer: 'นัดวันไหนครับ', sql: '', columns: [], rows: [], error: null }, error: null };
+    if (body.question.includes('พรุ่งนี้')) return { data: { answer: 'ตรวจสอบรายละเอียดแล้วกดยืนยันนัด', sql: '-- propose_booking', columns: Object.keys(BOOK), rows: [BOOK], error: null,
+      action: { type: 'book_appointment', args: { doctor: '7', date: '2026-11-20', time: '10:00' } } }, error: null };
     if (body.question.includes('ลบ')) return { data: { answer: '', sql: 'DELETE FROM patient', columns: [], rows: [], error: 'อนุญาตเฉพาะคำสั่ง SELECT เท่านั้น' }, error: null };
     if (body.question.includes('ว่าง')) return { data: { answer: 'ไม่พบข้อมูลที่ตรงกับคำถาม', sql: 'select 1', columns: [], rows: [], error: null }, error: null };
     return { data: { answer: 'มีแพทย์ 8 คน', sql: 'select count(*) as n from v_doctor_workload LIMIT 100', columns: ['n'], rows: [{ n: 8 }], error: null }, error: null }; };
@@ -71,6 +76,12 @@ await check('wrong password shows Thai error', async () => {
   await page.fill('#email', 'a@b.th'); await page.fill('#password', 'wrongpw'); await page.click('#login');
   await page.waitForFunction(() => document.getElementById('err').textContent.length > 0);
   assert.equal(await page.textContent('#err'), 'อีเมลหรือรหัสผ่านไม่ถูกต้อง'); });
+await check('every page says which time zone it uses: Thailand, Asia/Bangkok (GMT+7)', async () => {
+  for (const path of ['/index.html', '/register.html']) {
+    await page.goto(base + path);
+    const t = await page.textContent('#tz-clock'); assert.ok(t.includes('Asia/Bangkok') && t.includes('GMT+7') && t.includes('เวลาประเทศไทย'), path + ': ' + t);
+  }
+  await page.goto(base + '/index.html'); });
 await check('login page links to the separate registration page', async () => {
   assert.equal(await page.getAttribute('#signup', 'href'), 'register.html'); });
 const fillPatient = async (email, extra = {}) => {
@@ -134,6 +145,8 @@ await check('admin dashboard draws all 5 staff charts in order', async () => {
   assert.deepEqual(c[1].data[0], [150]);
   assert.deepEqual(c[3], { labels: ['อายุรกรรม', 'ไม่ระบุแผนก'], data: [[4, 0], [2, 2]] });
   assert.deepEqual(c[4], { labels: ['Pending', 'Screened'], data: [[1, 1]] }); });
+await check('app header shows the Thai time zone', async () => {
+  const t = await page.textContent('#tz-clock'); assert.ok(t.includes('Asia/Bangkok, GMT+7') && /\d{2}:\d{2} น\./.test(t), t); });
 await check('chat: answer, SQL evidence and raw table are shown; input disabled while processing', async () => {
   await page.click('[data-tab=chat]'); await page.fill('#q', 'มีแพทย์กี่คน'); await page.click('#send');
   assert.equal(await page.isDisabled('#send'), true); assert.ok((await page.textContent('#log')).includes('กำลังประมวลผล'));
@@ -148,6 +161,30 @@ await check('chat: refused dangerous question shows the reason and no table', as
 await check('chat: empty result shows ไม่พบข้อมูล', async () => {
   await page.fill('#q', 'ผลว่างไหม'); await page.click('#send');
   await page.waitForFunction(() => [...document.querySelectorAll('#log .msg.bot')].some((m) => m.textContent.includes('ไม่พบข้อมูล'))); });
+await check('chat: booking is only proposed; "ยืนยันนัด" sends it back to be saved; history goes with follow-ups', async () => {
+  await page.fill('#q', 'ขอนัดพบแพทย์'); await page.click('#send');
+  await page.waitForFunction(() => document.querySelector('#log').textContent.includes('นัดวันไหนครับ'));
+  await page.fill('#q', 'พรุ่งนี้ 10 โมง'); await page.click('#send');
+  await page.waitForSelector('#log .booking-card .confirm-booking');
+  const card = await page.textContent('#log .booking-card');
+  assert.ok(card.includes('แพทย์ ทดสอบ') && card.includes('2026-11-20') && card.includes('10:00'));
+  assert.equal(await page.locator('#log .msg.bot').last().locator('table').count(), 0, 'proposal shows the card, not the raw table');
+  const followUp = await page.evaluate(() => window.__chatBodies.at(-1));
+  assert.deepEqual(followUp.history.slice(-2), [{ role: 'user', content: 'ขอนัดพบแพทย์' }, { role: 'assistant', content: 'นัดวันไหนครับ' }]);
+  const before = await page.evaluate(() => window.__chatBodies.length);
+  await page.click('#log .booking-card .confirm-booking');
+  await page.waitForFunction(() => document.querySelector('#log').textContent.includes('บันทึกนัดแล้ว'));
+  assert.deepEqual(await page.evaluate(() => window.__chatBodies.at(-1)), { confirm_booking: { doctor: '7', date: '2026-11-20', time: '10:00' } });
+  assert.equal(await page.evaluate(() => window.__chatBodies.length), before + 1);
+  assert.equal(await page.locator('#log .booking-card .confirm-booking').count(), 0, 'button gone once saved');
+  assert.ok((await page.textContent('#log .booking-card')).includes('บันทึกแล้ว'));
+  // a second proposal can be cancelled: nothing is sent
+  await page.fill('#q', 'พรุ่งนี้ 10 โมง อีกครั้ง'); await page.click('#send');
+  await page.waitForFunction(() => document.querySelectorAll('#log .booking-card .cancel-booking').length === 1);
+  const n = await page.evaluate(() => window.__chatBodies.length);
+  await page.click('#log .booking-card .cancel-booking');
+  assert.ok((await page.locator('#log .booking-card').last().textContent()).includes('ไม่ได้บันทึก'));
+  assert.equal(await page.evaluate(() => window.__chatBodies.length), n); });
 await check('app.html#chat opens the Chat tab; an unknown hash like #constructor falls back to the data tab', async () => {
   await page.goto('about:blank'); await page.goto(base + '/app.html#chat');
   await page.waitForFunction(() => document.getElementById('page-title').textContent === 'ผู้ช่วย AI');

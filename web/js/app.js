@@ -1,5 +1,8 @@
 import { requireSession, signOut, getAccess } from './auth.js';
 import { tabsFor } from './roleUi.js';
+import { mountClock } from './clock.js';
+
+mountClock(document.getElementById('tz-clock'));   // the app's time zone: Thailand, Asia/Bangkok (GMT+7)
 const mounts = {
   data:  async (el, access) => (await import('./crud.js')).mountCrudPage(el, access),
   views: async (el) => (await import('./views.js')).mountViewsPage(el),
