@@ -30,6 +30,9 @@ export const READ_ONLY_RULE = 'You cannot modify data.';
 export const BOOKING_RULES = `The only change you can make is an appointment (booking, e.g. "นัดครั้งหน้า"): call propose_booking with the doctor, date (YYYY-MM-DD) and time (HH:MM).
 propose_booking does NOT save: say the appointment is ready and ask the user to check it and press ยืนยันนัด; never say it is saved.
 Use list_doctors to find a doctor. Turn relative dates ("พรุ่งนี้", "สัปดาห์หน้า", "อีก 2 สัปดาห์") into dates from today's date below.
+A day number alone ("วันที่ 13") is the next such date from today (this month, or next month if it has passed). Thai times: "8 โมง"/"8 โมงเช้า" = 08:00,
+"เที่ยง" = 12:00, "บ่ายโมง" = 13:00, "บ่าย 2 (โมง)" = 14:00, "4 โมงเย็น" = 16:00, "ครึ่ง" = :30 (e.g. "9 โมงครึ่ง" = 09:30).
+Never answer in plain text: every reply goes through a tool (use ask_user to ask).
 If the doctor, date or time is missing, or the HN for a staff account, call ask_user with one short question.
 You cannot change or delete anything else; if asked, say so briefly.`;
 const WEEKDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -51,7 +54,9 @@ export function cleanHistory(h: unknown): HistoryItem[] {
   return h.filter((m): m is HistoryItem => !!m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim() !== '')
     .slice(-6).map((m) => ({ role: m.role, content: m.content.trim().slice(0, 1000) }));
 }
-const MAX_STEPS = 4;
+const MAX_STEPS = 6;
+// sent once when the model answers in plain text without using any tool (e.g. asks "เดือนไหน?" as text)
+export const NUDGE = 'Reply only through the tools: call a data tool, propose_booking, or ask_user if you need to ask the user something. Do not answer in plain text.';
 const fail = (error: string): ChatResult => ({ answer: '', sql: '', columns: [], rows: [], error });
 
 export async function handleMcpChat(deps: AgentDeps, question: string, user: ChatUser, history: unknown = [], now = new Date()): Promise<ChatResult> {
@@ -69,13 +74,22 @@ export async function handleMcpChat(deps: AgentDeps, question: string, user: Cha
     const listed = await client.listTools();
     const tools: ToolDef[] = listed.tools.map((t) => ({ type: 'function', function: { name: t.name, description: t.description ?? '', parameters: t.inputSchema } }));
     const messages: Msg[] = [{ role: 'system', content: systemPrompt(user, now, !!deps.actions) }, ...cleanHistory(history), { role: 'user', content: q }];
-    let answer = '';
+    let answer = '', nudged = false;
+    const attempts: { tool: string; error?: string }[] = [];   // every tool call, also the refused ones (for chat_logs)
     for (let step = 0; step < MAX_STEPS; step++) {
       let reply: AssistantMsg;
       try { reply = await deps.llm(messages, tools); }
       catch (e) { const why = String((e as Error)?.message ?? e).slice(0, 300); console.error('[chat-mcp] LLM call failed:', why);
         await log({ error: `llm_unavailable: ${why}` }); return fail('ระบบ AI ไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง'); }
-      if (!reply.tool_calls?.length) { answer = (reply.content ?? '').trim(); break; }
+      if (!reply.tool_calls?.length) {
+        answer = (reply.content ?? '').trim();
+        if (outcomes.length === 0 && !nudged && step < MAX_STEPS - 1) {   // plain text with no evidence: remind once
+          nudged = true;
+          messages.push({ role: 'assistant', content: reply.content ?? '' }, { role: 'user', content: NUDGE });
+          continue;
+        }
+        break;
+      }
       messages.push({ role: 'assistant', content: reply.content ?? null, tool_calls: reply.tool_calls });
       for (const tc of reply.tool_calls) {
         let args: Record<string, unknown> = {};
@@ -84,7 +98,8 @@ export async function handleMcpChat(deps: AgentDeps, question: string, user: Cha
         try {
           const res = await client.callTool({ name: tc.function.name, arguments: args });
           content = ((res.content as { text?: string }[] | undefined)?.[0]?.text) ?? '';
-        } catch (e) { content = `Tool error: ${(e as Error).message.slice(0, 200)}`; }
+          attempts.push(res.isError ? { tool: tc.function.name, error: content.slice(0, 300) } : { tool: tc.function.name });
+        } catch (e) { content = `Tool error: ${(e as Error).message.slice(0, 200)}`; attempts.push({ tool: tc.function.name, error: content }); }
         messages.push({ role: 'tool', tool_call_id: tc.id, content });
       }
       if (outcomes.some((o) => o.question)) break;   // asked the user something: wait for the reply
@@ -103,7 +118,14 @@ export async function handleMcpChat(deps: AgentDeps, question: string, user: Cha
         columns: proposal.columns, rows: proposal.rows, error: null, tool_calls: trace, action: { type: 'book_appointment', args: proposal.action } };
     }
     if (!last) {
-      await log({ error: 'no_tool_result', tool_name: 'mcp' });
+      const tried = 'mcp:' + attempts.map((a) => a.tool + (a.error ? '!' : '')).join(',');
+      const refusedBooking = attempts.findLast((a) => a.tool === 'propose_booking' && a.error);
+      if (refusedBooking) {   // the database refused the appointment: say why (in Thai) instead of a generic message
+        await log({ error: `booking_refused: ${refusedBooking.error}`, tool_name: tried });
+        return fail(bookingError(refusedBooking.error!));
+      }
+      const why = attempts.findLast((a) => a.error)?.error ?? (answer ? `text only: ${answer.slice(0, 150)}` : 'no answer');
+      await log({ error: `no_tool_result: ${why}`, tool_name: tried });
       return fail('ไม่สามารถหาคำตอบจากข้อมูลของระบบได้ กรุณาถามเกี่ยวกับข้อมูลในระบบโรงพยาบาล เช่น คิวนัดหมาย เตียง ยา หรือค่ารักษา');
     }
     if (last.rows.length === 0) answer = 'ไม่พบข้อมูลที่ตรงกับคำถาม';
@@ -141,6 +163,7 @@ export async function confirmBooking(deps: AgentDeps, raw: unknown, user: ChatUs
 }
 // Thai message for a refused booking (the database's reasons are in English for the model).
 export function bookingError(why: string): string {
+  if (/function .*(chat_book_appointment|chat_doctor_directory)|schema cache/.test(why)) return 'ระบบนัดหมายยังไม่พร้อมใช้งาน (ผู้ดูแลระบบต้องรัน migration 2026-11-12_chat_booking.sql)';
   if (/already has an appointment/.test(why)) return 'ช่วงเวลานี้มีนัดแล้ว กรุณาขอนัดเวลาอื่น';
   if (/in the past/.test(why)) return 'วันที่นัดผ่านมาแล้ว กรุณาเลือกวันใหม่';
   if (/may not|only for itself|permission denied/.test(why)) return 'บัญชีนี้ไม่มีสิทธิ์ทำนัดนี้';
