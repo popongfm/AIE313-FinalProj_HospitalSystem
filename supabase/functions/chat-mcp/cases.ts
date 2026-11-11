@@ -28,7 +28,8 @@ let failed = 0;
 for (const [i, c] of CASES.entries()) {
   let n = 0;
   const script = [c.tool, { role: 'assistant', content: 'สรุปผล' } as AssistantMsg];
-  const r = await handleMcpChat({ llm: async () => script[n++], runQuery: psql, log: async () => {} }, c.q, { id: 'test' });
+  // after the scripted tool call the model keeps answering in text (also after the agent's one reminder)
+  const r = await handleMcpChat({ llm: async () => script[Math.min(n++, script.length - 1)], runQuery: psql, log: async () => {} }, c.q, { id: 'test' });
   const actual = r.error ? `ปฏิเสธ/ผิดพลาด: ${r.error}` : `${r.rows.length} แถว`;
   const pass = (c.expect === 'rows' && !r.error && r.rows.length > 0) || (c.expect === 'zero' && !r.error && r.rows.length === 0) || (c.expect === 'error' && !!r.error);
   if (!pass) failed++;

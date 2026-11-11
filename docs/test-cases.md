@@ -88,20 +88,20 @@ Tool ที่เปิดให้ LLM: `list_views`, `query_view`, `aggregate_
 
 | ID | Action | Expected | Actual | Result |
 |---|---|---|---|---|
-| A1 | ผู้ป่วยพิมพ์ "ขอนัดหมอ<ชื่อ> พรุ่งนี้ 10 โมง" | การ์ดนัด (แพทย์ วันที่ เวลา HN ของตัวเอง) + ปุ่มยืนยันนัด; ยังไม่มีแถวใน `booking` | DB/agent/e2e | DB PASS, mock PASS, todo |
-| A2 | กด "ยืนยันนัด" | "บันทึกนัดแล้ว … คิวที่ N"; มีแถวใหม่สถานะ pending; ปุ่มหาย | DB/e2e | DB PASS, mock PASS, todo |
-| A3 | พิมพ์ "ขอนัดพบแพทย์" (ไม่บอกวันเวลา) แล้วตอบ "พรุ่งนี้ 10 โมง" | AI ถามกลับ (ask_user) แล้วเข้าใจคำตอบต่อจากข้อความก่อนหน้า | agent test | mock PASS, todo |
-| A4 | พยาบาล/แพทย์: "นัดครั้งหน้าให้ HN0005 กับหมอ<ชื่อ> อีก 2 สัปดาห์ 9 โมง" | การ์ดนัดของ HN0005; ไม่ใส่ HN → AI ถาม HN | DB/e2e | DB PASS, todo |
-| A5 | ขอนัดเวลาที่หมอมีนัดแล้ว | AI บอกว่าเวลานั้นไม่ว่าง (มีรายการเวลาที่ถูกจอง) และไม่สร้างนัด | DB/agent | DB PASS, todo |
-| A6 | ผู้ป่วยแก้ request ให้นัดแทน HN อื่น / วันที่ผ่านมาแล้ว / doctor แฝง SQL | ปฏิเสธทั้งหมด ไม่มีแถวใหม่ | DB/e2e | DB PASS, todo |
-| A7 | ขอให้ AI ลบหรือแก้ข้อมูลอื่น ("ลบผู้ป่วย HN0001") | ปฏิเสธ (แก้ได้เฉพาะการนัด) | agent | todo |
+| A1 | ผู้ป่วยพิมพ์ "ขอนัดหมอ<ชื่อ> พรุ่งนี้ 10 โมง" | การ์ดนัด (แพทย์ วันที่ เวลา HN ของตัวเอง) + ปุ่มยืนยันนัด; ยังไม่มีแถวใน `booking` | Card for หมอมาลี บุญมา 2026-11-13 08:00 (from "วันที่ 13 เวลา 8 โมงเช้า"), nothing saved (deployed) | DB PASS, mock PASS, live PASS (2026-11-11) |
+| A2 | กด "ยืนยันนัด" | "บันทึกนัดแล้ว … คิวที่ N"; มีแถวใหม่สถานะ pending; ปุ่มหาย | Saved after ยืนยันนัด (deployed) | DB PASS, mock PASS, live PASS (2026-11-11) |
+| A3 | พิมพ์ "ขอนัดพบแพทย์" (ไม่บอกวันเวลา) แล้วตอบ "พรุ่งนี้ 10 โมง" | AI ถามกลับ (ask_user) แล้วเข้าใจคำตอบต่อจากข้อความก่อนหน้า | "ขอนัดพบแพทย์สัปดาห์หน้า" → asked back, follow-up understood (deployed) | mock PASS, live PASS (2026-11-11) |
+| A4 | พยาบาล/แพทย์: "นัดครั้งหน้าให้ HN0005 กับหมอ<ชื่อ> อีก 2 สัปดาห์ 9 โมง" | การ์ดนัดของ HN0005; ไม่ใส่ HN → AI ถาม HN | DB/e2e · deployed: as expected | DB PASS, live PASS (2026-11-11) |
+| A5 | ขอนัดเวลาที่หมอมีนัดแล้ว | AI บอกว่าเวลานั้นไม่ว่าง (มีรายการเวลาที่ถูกจอง) และไม่สร้างนัด | DB/agent · deployed: as expected | DB PASS, live PASS (2026-11-11) |
+| A6 | ผู้ป่วยแก้ request ให้นัดแทน HN อื่น / วันที่ผ่านมาแล้ว / doctor แฝง SQL | ปฏิเสธทั้งหมด ไม่มีแถวใหม่ | DB/e2e · deployed: as expected | DB PASS, live PASS (2026-11-11) |
+| A7 | ขอให้ AI ลบหรือแก้ข้อมูลอื่น ("ลบผู้ป่วย HN0001") | ปฏิเสธ (แก้ได้เฉพาะการนัด) | agent · deployed: as expected | live PASS (2026-11-11) |
 
 ## เวลา: ประเทศไทย Asia/Bangkok (GMT+7)
 
 | ID | Action | Expected | Actual | Result |
 |---|---|---|---|---|
-| T1 | เปิดหน้าแรก หน้าสมัคร และหน้าระบบ | ทุกหน้ามีป้าย "เวลาประเทศไทย (Asia/Bangkok, GMT+7)" พร้อมเวลาปัจจุบันของไทย | smoke | mock PASS, todo |
-| T2 | SQL editor: `SHOW timezone; SELECT now(), hospital_today();` | `Asia/Bangkok`, เวลาลงท้าย `+07`, วันที่ของไทย | `db/tests/75_timezone.sql` | DB PASS, todo |
-| T3 | ดู view คิววันนี้ ช่วง 00:00–07:00 เวลาไทย | เป็นคิวของวันนี้ (ไทย) ไม่ใช่เมื่อวาน (UTC) | view ใช้ `hospital_today()` | DB PASS |
-| T4 | เพิ่ม/แก้ visit (วันที่รับ 10:00) แล้วเปิดดูอีกครั้ง | ยังแสดง 10:00 (เวลาไทย GMT+7) ไม่เลื่อนเป็น 03:00 | unit test (TZ=America/New_York) | PASS, todo |
+| T1 | เปิดหน้าแรก หน้าสมัคร และหน้าระบบ | ทุกหน้ามีป้าย "เวลาประเทศไทย (Asia/Bangkok, GMT+7)" พร้อมเวลาปัจจุบันของไทย | smoke · deployed: as expected | mock PASS, live PASS (2026-11-11) |
+| T2 | SQL editor: `SHOW timezone; SELECT now(), hospital_today();` | `Asia/Bangkok`, เวลาลงท้าย `+07`, วันที่ของไทย | `db/tests/75_timezone.sql` · deployed: as expected | DB PASS, live PASS (2026-11-11) |
+| T3 | ดู view คิววันนี้ ช่วง 00:00–07:00 เวลาไทย | เป็นคิวของวันนี้ (ไทย) ไม่ใช่เมื่อวาน (UTC) | view ใช้ `hospital_today()` · deployed: as expected | DB PASS, live PASS (2026-11-11) |
+| T4 | เพิ่ม/แก้ visit (วันที่รับ 10:00) แล้วเปิดดูอีกครั้ง | ยังแสดง 10:00 (เวลาไทย GMT+7) ไม่เลื่อนเป็น 03:00 | unit test (TZ=America/New_York) · deployed: as expected | PASS, live PASS (2026-11-11) |
 

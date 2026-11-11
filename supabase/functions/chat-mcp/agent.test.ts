@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { handleMcpChat, confirmBooking, bangkokToday, cleanHistory, bookingError, type AgentDeps, type AssistantMsg, type Msg } from './agent.ts';
+import { handleMcpChat, confirmBooking, bangkokToday, cleanHistory, bookingError, NUDGE, type AgentDeps, type AssistantMsg, type Msg } from './agent.ts';
 import type { BookingArgs } from './mcpServer.ts';
 import { makeLlm, DEFAULT_MODEL } from './llmTools.ts';
 
@@ -64,7 +64,7 @@ test('LLM failure / DB failure / empty or long question -> friendly errors, no c
 test('endless tool calling stops after the step limit', async () => {
   const { d, seen } = deps(Array.from({ length: 10 }, (_, i) => call('list_views', {}, 'c' + i)));
   const r = await handleMcpChat(d, 'q', U);
-  assert.ok(r.error); assert.equal(seen.length, 4);
+  assert.ok(r.error); assert.equal(seen.length, 6);
 });
 test('makeLlm sends tools and parses tool_calls; HTTP errors throw', async () => {
   let body: any;
@@ -146,4 +146,28 @@ test('confirmBooking: saves (confirm=true), checks the arguments first, Thai mes
   assert.equal((await confirmBooking(refused.d, { doctor: '3', date: '2026-11-20', time: '10:00', hn: 'HN0001' }, { id: 'u1', role: 'patient' })).error, 'บัญชีนี้ไม่มีสิทธิ์ทำนัดนี้');
   assert.equal(bookingError('date 2026-01-01 is in the past'), 'วันที่นัดผ่านมาแล้ว กรุณาเลือกวันใหม่');
   assert.equal((await confirmBooking(deps([]).d, { doctor: '3', date: '2026-11-20', time: '10:00' }, U)).error, 'ข้อมูลนัดไม่ถูกต้อง กรุณาขอนัดใหม่อีกครั้ง');
+});
+
+test('plain-text reply without tools: reminded once, then a real tool answer is accepted', async () => {
+  const { d, seen } = withActions([say('ต้องการนัดเดือนไหนครับ?'), call('ask_user', { question: 'ต้องการนัดวันที่ 13 ของเดือนไหนครับ' })]);
+  const r = await handleMcpChat(d, 'ขอนัดหมอมาลี วันที่ 13 เวลา 8 โมง', { id: 'u1', role: 'patient' });
+  assert.equal(r.error, null); assert.equal(r.answer, 'ต้องการนัดวันที่ 13 ของเดือนไหนครับ');
+  assert.equal(seen[1].at(-1)?.content, NUDGE);
+});
+test('still plain text after the reminder -> refused, and chat_logs says why', async () => {
+  const { d, logs } = withActions([say('มีหมอ 10 คน'), say('มีหมอ 10 คนจริง ๆ')]);
+  const r = await handleMcpChat(d, 'มีหมอกี่คน', U);
+  assert.match(r.error!, /ไม่สามารถหาคำตอบ/); assert.match(String(logs.at(-1)?.error), /^no_tool_result: text only: มีหมอ 10 คน/);
+});
+test('appointment refused by the database and the model gives up -> the Thai reason, logged', async () => {
+  const { d, logs } = withActions([call('propose_booking', { doctor: 'มาลี', date: '2026-11-13', time: '08:00' }), say('ขออภัย'), say('ขออภัยครับ')],
+    async () => { throw new Error('Could not find the function public.chat_book_appointment(as_user, p_confirm, p_date) in the schema cache'); });
+  const r = await handleMcpChat(d, 'ขอนัดหมอมาลี', { id: 'u1', role: 'patient' });
+  assert.match(r.error!, /ระบบนัดหมายยังไม่พร้อม/); assert.match(String(logs.at(-1)?.error), /^booking_refused: Not possible: Could not find/);
+  assert.equal(logs.at(-1)?.tool_name, 'mcp:propose_booking!');
+});
+
+test('an empty LLM reply is an LLM failure, not a crash', async () => {
+  const r = await handleMcpChat({ llm: async () => undefined as unknown as AssistantMsg, runQuery: async () => [], log: async () => {} }, 'q', U);
+  assert.match(r.error!, /ระบบ AI ไม่พร้อม/);
 });
