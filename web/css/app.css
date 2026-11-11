@@ -4,7 +4,7 @@
   --ink: #14312c; --muted: #4f6862; --paper: #ffffff; --mist: #eef4f1; --line: #d2e0da;
   --scrub: #0f6b5e; --scrub-deep: #0b4f46; --scrub-ink: #ffffff; --scrub-soft: #dcede7;
   --deep: #0a3f38; --deep-2: #0e5a50; --on-deep: #ffffff; --on-deep-muted: #c3e0d7; --mint: #8fe0c9; --mint-ink: #05261f;
-  --danger: #b4232f; --danger-soft: #fbeaea;
+  --danger: #b4232f; --danger-soft: #fbeaea; --danger-ink: #ffffff;
   --z-appt: #2f5d9e; --z-rec: #0f6b5e; --z-rx: #9a5d0c; --z-rep: #74467f;
   --shadow: 0 24px 48px -28px rgba(6, 38, 33, .55);
   /* web fonts first; then Thai system fonts (Android/Linux, Windows, macOS/iOS) so text stays one face if Google Fonts fails */
@@ -29,7 +29,7 @@
     --ink: #e2eee9; --muted: #9db3ac; --paper: #14221f; --mist: #0e1917; --line: #26392f;
     --scrub: #47b49e; --scrub-deep: #2f8f7c; --scrub-ink: #06211c; --scrub-soft: #173a33;
     --deep: #0a2a25; --deep-2: #0f3a33;
-    --danger: #f08a8a; --danger-soft: #3a1c1f;
+    --danger: #f08a8a; --danger-soft: #3a1c1f; --danger-ink: #2a0d10;
     --shadow: 0 24px 48px -28px rgba(0, 0, 0, .8);
     --col-shadow: rgb(0 0 0 / .6);
     --e2: 0 18px 40px -18px rgb(0 0 0 / .85);
@@ -76,7 +76,7 @@ button.ghost:hover, .btn.ghost:hover { background: var(--mist); border-color: tr
 button.danger { background: var(--danger-soft); border-color: transparent; color: var(--danger); }
 button.sm, .btn.sm { min-height: var(--h-sm); padding: 0 12px; font-size: 14px; border-radius: var(--r-sm); gap: 6px; }
 button:disabled, button:disabled:hover { opacity: .55; cursor: default; transform: none; }
-button[data-armed="1"], button[data-armed="1"]:hover { border-color: var(--danger); color: #ffffff; background: var(--danger); }
+button[data-armed="1"], button[data-armed="1"]:hover { border-color: var(--danger); color: var(--danger-ink); background: var(--danger); }
 #signup { border-color: var(--scrub); color: var(--scrub); background: transparent; }
 .icon { width: 18px; height: 18px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .sm .icon { width: 16px; height: 16px; }
@@ -176,7 +176,8 @@ button[data-armed="1"], button[data-armed="1"]:hover { border-color: var(--dange
   background: var(--mint) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M5.5 10.5l3 3 6-7' fill='none' stroke='%2305261f' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 22px no-repeat; }
 .sample { margin: 0; color: var(--ink); background: var(--mist); border-radius: 12px; padding: 22px; box-shadow: 0 40px 80px -40px rgba(0, 0, 0, .6); }
 .sample figcaption { color: var(--muted); font-size: 14px; margin-bottom: 4px; }
-.sample .msg { max-width: 92%; }
+.sample .msg { max-width: 92%; margin: 10px 0; }
+.sample .msg.bot { background: var(--paper); }
 
 .steps { list-style: none; counter-reset: step; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 32px; margin: 36px 0 0; padding: 0; }
 .steps li { counter-increment: step; position: relative; padding-top: 60px; }

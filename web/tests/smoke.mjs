@@ -83,6 +83,15 @@ await check('status select shows Thai labels with database values', async () => 
     [['pending', 'รอยืนยัน'], ['confirmed', 'ยืนยันแล้ว'], ['completed', 'เสร็จสิ้น'], ['cancelled', 'ยกเลิก']]);
   await page.click('#form .drawer-foot button[type=button]'); await page.waitForSelector('#form', { state: 'hidden' });
   await page.selectOption('#t', 'patient'); await page.waitForSelector('#list table'); });
+await check('drawer: Escape works after clicking a non-focusable part; the page behind is inert while open', async () => {
+  await page.click('#new'); await page.click('#form h2');
+  assert.equal(await page.$eval('#panel .card', (e) => e.inert), true); assert.equal(await page.$eval('#panel .zone-sign', (e) => e.inert), true);
+  await page.keyboard.press('Escape'); await page.waitForSelector('#form', { state: 'hidden' });
+  assert.equal(await page.$eval('#panel .card', (e) => e.inert), false); });
+await check('after saving an edit, focus lands on a control, not the page body', async () => {
+  await page.locator('#list button', { hasText: 'แก้ไข' }).first().click(); await page.click('#form button[type=submit]');
+  await page.waitForSelector('#form', { state: 'hidden' }); await page.waitForSelector('#list table');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'new'); });
 await check('duplicate booking shows Thai duplicate error', async () => {
   await page.selectOption('#t', 'booking'); await page.click('#new');
   await page.fill('#f_patient_id', '1'); await page.fill('#f_staff_id', '1'); await page.fill('#f_booking_date', '2026-11-20'); await page.fill('#f_booking_time', '09:00'); await page.fill('#f_queue_no', '1'); await page.selectOption('#f_status', 'pending');
@@ -102,6 +111,9 @@ await check('table search hides rows and updates the count', async () => {
   assert.equal(await page.locator('#list tbody tr:visible').count(), 0); assert.equal(await page.textContent('#list .table-count'), 'แสดง 0 จาก 1 รายการ');
   await page.fill('#list .table-search', 'hn1'); assert.equal(await page.locator('#list tbody tr:visible').count(), 1);
   assert.equal(await page.textContent('#list .table-count'), 'แสดง 1 จาก 1 รายการ'); });
+await check('table search ignores the actions column', async () => {
+  await page.fill('#list .table-search', 'แก้ไข'); assert.equal(await page.locator('#list tbody tr:visible').count(), 0);
+  await page.fill('#list .table-search', ''); });
 const headings = () => page.$$eval('#panel h3', (h) => h.map((x) => x.textContent));
 await check('admin dashboard draws all 5 staff charts in order', async () => {
   await page.evaluate(() => { window.__charts = []; });

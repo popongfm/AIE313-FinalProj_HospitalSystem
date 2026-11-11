@@ -62,10 +62,20 @@ export async function mountCrudPage(el, access = {}) {
     if (value != null) input.value = c.type === 'datetime-local' ? toDatetimeLocal(value) : value;
     wrap.append(label, input); return wrap;
   }
+  // while the drawer is open the page behind it is inert (keyboard and screen readers stay in the drawer; the app bar stays usable)
+  const behind = () => [el.querySelector('.card'), sign];
+  const onKey = (e) => { if (e.key === 'Escape' && !form.hidden) { e.preventDefault(); closeForm(); } };
+  // focus back where the user was; when that button was rebuilt (the list reloaded), the add button or the table picker
+  function restoreFocus() {
+    if (opener && opener.isConnected) opener.focus();
+    else if (!newBtn.hidden) newBtn.focus(); else sel.focus();
+  }
   function closeForm() {
     if (form.hidden) return;
     form.hidden = true; backdrop.hidden = true; formErr.textContent = '';
-    if (opener && opener.isConnected) opener.focus();
+    behind().forEach((n) => { n.inert = false; });
+    document.removeEventListener('keydown', onKey);
+    restoreFocus();
   }
   async function openForm(row, from) {
     editing = row; opener = from || null; const cfg = tables[sel.value];
@@ -76,6 +86,8 @@ export async function mountCrudPage(el, access = {}) {
     const cancel = button('ยกเลิก'); cancel.onclick = closeForm;
     foot.replaceChildren(cancel, ok);
     formErr.textContent = ''; form.hidden = false; backdrop.hidden = false;
+    behind().forEach((n) => { n.inert = true; });
+    document.addEventListener('keydown', onKey);
     body.querySelector('input, select')?.focus();
   }
   // show a source's label next to its id column (e.g. the doctor's name next to staff_id)
@@ -126,12 +138,14 @@ export async function mountCrudPage(el, access = {}) {
     const { error } = await supabase.from(sel.value).delete().eq(cfg.pk, row[cfg.pk]);
     err.textContent = error ? friendlyError(error) : ''; if (!error) toast('ลบข้อมูลแล้ว');
     await load(true);   // keep the message across the reload
+    if (document.activeElement === document.body) { opener = null; restoreFocus(); }
   }
   async function cancelBooking(row) {
     const cfg = tables[sel.value];
     const { error } = await supabase.from(sel.value).update({ status: 'cancelled' }).eq(cfg.pk, row[cfg.pk]);
     err.textContent = error ? friendlyError(error) : ''; if (!error) toast('ยกเลิกคิวแล้ว');
     await load(true);
+    if (document.activeElement === document.body) { opener = null; restoreFocus(); }
   }
   form.addEventListener('submit', async (e) => {
     e.preventDefault(); if (saving) return;   // one save at a time
@@ -146,8 +160,8 @@ export async function mountCrudPage(el, access = {}) {
     if (error) { showError(friendlyError(error)); return; }
     const wasEdit = !!editing;
     closeForm(); err.textContent = ''; toast(wasEdit ? 'บันทึกการแก้ไขแล้ว' : 'เพิ่มข้อมูลแล้ว'); await load();
+    if (document.activeElement === document.body) restoreFocus();   // the edit button that opened the drawer was rebuilt
   });
-  form.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); closeForm(); } });
   close.addEventListener('click', closeForm);
   backdrop.addEventListener('click', closeForm);
   sel.addEventListener('change', () => { closeForm(); load(); });

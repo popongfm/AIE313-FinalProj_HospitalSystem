@@ -42,7 +42,10 @@ export function withToolbar(tableEl, { placeholder = 'ค้นหาในต�
   const count = document.createElement('span'); count.className = 'table-count'; count.setAttribute('aria-live', 'polite');
   bar.append(field, count);
   const rows = [...tableEl.querySelectorAll('tbody tr')];
-  const cells = rows.map((tr) => [...tr.cells].map((td) => td.textContent));
+  // search the data cells only (not the จัดการ buttons); a status cell matches its Thai label and its database value
+  const actions = tableEl.querySelector('table.has-actions') ? 1 : 0;
+  const cells = rows.map((tr) => [...tr.cells].slice(0, tr.cells.length - actions)
+    .map((td) => td.textContent + (td.querySelector('.badge') ? ' ' + td.querySelector('.badge').dataset.value : '')));
   const update = () => {
     let shown = 0;
     rows.forEach((tr, i) => { const ok = matchesQuery(cells[i], input.value); tr.hidden = !ok; if (ok) shown++; });
