@@ -120,7 +120,13 @@ jobs:
       - name: Install Playwright
         run: |
           npm install --no-save --no-audit --no-fund --prefix "$RUNNER_TEMP/pw" "playwright@$PLAYWRIGHT_VERSION"
-          "$RUNNER_TEMP/pw/node_modules/.bin/playwright" install --with-deps chromium
+          PW="$RUNNER_TEMP/pw/node_modules/.bin/playwright"
+          # the browser itself comes from Playwright's CDN; the runner image already has Chromium's system libraries.
+          # install-deps (apt) only adds extra fonts and has failed when the runner's Ubuntu mirrors were unreachable
+          # (DNS), so give it 2 minutes and carry on without it: the smoke test reads text, it does not compare pixels.
+          "$PW" install chromium
+          timeout 120 "$PW" install-deps chromium \
+            || echo "::warning::playwright install-deps failed (apt mirrors unreachable?); using the runner's preinstalled libraries"
       - name: Browser smoke test
         run: PLAYWRIGHT_PATH="$RUNNER_TEMP/pw/node_modules/playwright" node web/tests/smoke.mjs
 
