@@ -35,13 +35,15 @@ def diagram(tables, title):
         if ch in tset and p in tset:
             card = '||--o|' if cc in pks[ch] else ('|o--o{' if nullable[(ch, cc)] else '||--o{')
             L.append('    %s %s %s : "%s"' % (p, card, ch, cc))
-    if 'profiles' in tset and 'auth_users' in tset:
-        L.append('    auth_users ||--o| profiles : "user_id"')
+    # accounts: staff.user_id / patient.user_id -> auth.users (Supabase Auth); unique, so each account is one person row
+    for ch, cc, p in fks:
+        if p == 'users' and ch in tset and 'auth_users' in tset:
+            L.append('    auth_users ||--o| %s : "%s"' % (ch, cc))
     if 'chat_logs' in tset and 'auth_users' in tset:   # logical link only: chat_logs.user_id has no FK
         L.append('    auth_users ||..o{ chat_logs : "user_id (no FK)"')
     return '\n'.join(L) + '\n'
 
-core = ['department','staff','patient','profiles','chat_logs','auth_users']
+core = ['department','staff','patient','chat_logs','auth_users']
 A = ['booking','feedback']; C = ['room','bed','visit','admission','diagnosis','lab_result','insurance_coverage','daily_charge']
 B = ['drug','drug_lot','prescription','prescription_item','dispense_record','inventory','drug_allergy_record']
 allt = [t for t in cols]

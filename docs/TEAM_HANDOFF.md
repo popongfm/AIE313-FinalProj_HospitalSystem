@@ -8,7 +8,7 @@
 | A — Booking | booking, feedback | `docs/er/er_member_A_booking.png` | v_booking_queue_today, v_upcoming_bookings, v_doctor_workload, v_feedback_summary |
 | B — Pharmacy | drug, drug_lot, prescription, prescription_item, dispense_record, inventory, drug_allergy_record | `docs/er/er_member_B_pharmacy.png` | v_pharmacist_screening_queue, v_inventory_stock_status, v_drug_cost_summary |
 | C — Records | room, bed, visit, admission, diagnosis, lab_result, insurance_coverage, daily_charge | `docs/er/er_member_C_records.png` | v_bed_occupancy, v_visit_billing, v_top_diagnosis |
-| ใช้ร่วมกัน | department, staff, patient, profiles, chat_logs | `docs/er/er_core_shared.png` | — |
+| ใช้ร่วมกัน | department, staff, patient, chat_logs (บัญชีผูกด้วย `staff.user_id` / `patient.user_id`) | `docs/er/er_core_shared.png` | — |
 
 ## ทุกคนต้องทำ (ส่วนบุคคล ~5 นาที/คน + ตอบคำถามสด)
 1. อ่านและเข้าใจตาราง/ER/View ของตัวเอง (ผู้สอนอาจให้แก้ Query สด)
@@ -18,10 +18,10 @@
 5. ระบุหน้าที่ของตนในเว็บ/Chat
 
 ## งานกลุ่ม (ตกลงว่าใครทำ)
-- [ ] สร้าง Supabase project, รัน `schema.sql` แล้ว `seed.sql`, เปิด sign-up และปิด Confirm email สำหรับ demo, สมัครบัญชีจากหน้าเว็บแล้วเพิ่มแถว `profiles`, ตั้ง `statement_timeout` (ขั้นตอนใน README)
+- [ ] สร้าง Supabase project, รัน `schema.sql` แล้ว `seed.sql`, เปิด sign-up และปิด Confirm email สำหรับ demo, สมัครบัญชี admin จากหน้าเว็บด้วย `admin@hospital.example` (trigger ผูกให้เอง), ตั้ง `statement_timeout` (ขั้นตอนใน README)
 - [ ] ขอ Groq API key, deploy `chat-mcp`, ตั้ง secret (ห้ามใส่ key ในรีโป)
 - [ ] push GitHub (รัน `bash scripts/check-secrets.sh` ก่อน), build image ขึ้น Docker Hub, สร้าง Web Service บน Render จาก image แล้วตั้ง `SUPABASE_URL` / `SUPABASE_ANON_KEY` และใส่ URL ของ Render ใน Supabase Auth (ขั้นตอนใน README)
-- [ ] ทดสอบบนเว็บจริง: Registration, Login, CRUD (ลอง double-booking และลบผู้ป่วยที่มี visit), Views, Dashboard, ถาม Chat ด้วย LLM จริง, บัญชีที่ยังไม่อนุมัติต้องไม่เห็นข้อมูล (S2–S4) แล้วกรอกผลที่ค้างใน `docs/test-cases.md`
+- [ ] ทดสอบบนเว็บจริง: Registration, Login, CRUD (ลอง double-booking และลบผู้ป่วยที่มี visit), Views, Dashboard, ถาม Chat ด้วย LLM จริง, สมัครผู้ป่วย/เจ้าหน้าที่ (R1–R5), บัญชีที่ยังไม่ได้ผูกต้องไม่เห็นข้อมูล (S2–S4) แล้วกรอกผลที่ค้างใน `docs/test-cases.md`
 - [ ] ถ่ายภาพหน้าจอระบบจริงใส่รายงาน
 - [ ] รายงาน PDF ตาม Template (TH Sarabun PSK 14pt): ที่มา วัตถุประสงค์ ขอบเขต, Use Case/Activity Diagram, ระบุ LLM+รุ่นที่ใช้ และแผนภาพ Web → Edge Function (MCP) → LLM → Supabase
 - [ ] สไลด์ PDF รวมไฟล์เดียว (ส่วนกลุ่ม 10–15 นาที + ส่วนบุคคลของทุกคน)
@@ -33,7 +33,7 @@
 
 ## ข้อควรรู้
 - Chat ใช้ MCP (วิธี C) เป็นค่าเริ่มต้น; มี Text-to-SQL (วิธี B) เป็นตัวสำรอง
-- สมัครสมาชิกเองได้จากหน้าเว็บ (โจทย์บังคับหน้า Registration) แต่ต้องมีแถวใน `profiles` จึงจะเห็นข้อมูล — ตาราง, view และ chat เช็คสิทธิ์นี้ทั้งหมด คนนอกที่สมัครเข้ามาจึงอ่านข้อมูลผู้ป่วยไม่ได้
+- สมัครสมาชิกที่ `register.html` เลือก "ผู้ป่วย / เจ้าหน้าที่" แล้ว trigger `handle_new_user` บน `auth.users` ผูกบัญชีให้อัตโนมัติ (ไม่ต้อง copy UUID) ผู้ป่วยผูกกับเวชระเบียนเดิมด้วยเลขบัตร + วันเกิด หรือได้ HN ใหม่ เจ้าหน้าที่ผูกกับแถว `staff` ที่ admin ใส่อีเมลไว้ คนนอกที่สมัครเป็นเจ้าหน้าที่จึงไม่เห็นข้อมูลจนกว่า admin จะเพิ่มอีเมล (ตาราง, view และ chat เช็คสิทธิ์ทั้งหมด)
 - บัญชี role `patient` (ผูกกับ `patient_id`) เห็นเฉพาะข้อมูลของตัวเอง จองและยกเลิกคิวเองได้ แก้ได้เฉพาะเบอร์โทร อีเมล ที่อยู่ (policy และ trigger อยู่ท้าย `db/06_rls.sql`) ส่วนบุคลากรเห็นทุกแถว — ตารางสรุปอยู่ใน README
 - ทุก view มีเงื่อนไข `(current_user NOT IN ('anon','authenticated') OR is_app_user())` ใน WHERE เพื่อเช็คสิทธิ์ข้างต้น ควรอธิบายได้ตอนนำเสนอ View ของตัวเอง
 - ข้อมูลทั้งหมดเป็นข้อมูลจำลอง

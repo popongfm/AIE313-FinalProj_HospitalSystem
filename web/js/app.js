@@ -30,7 +30,7 @@ const access = await getAccess(session);
 if (!access.linked) {
   const note = document.createElement('div');
   note.id = 'pending'; note.className = 'card err'; note.setAttribute('role', 'alert');
-  note.textContent = 'บัญชีนี้ยังไม่ได้รับสิทธิ์ใช้งาน จึงยังไม่เห็นข้อมูล กรุณาติดต่อผู้ดูแลระบบเพื่ออนุมัติ';
+  note.textContent = 'บัญชีนี้ยังไม่ได้ผูกกับข้อมูลเจ้าหน้าที่ จึงยังไม่เห็นข้อมูล กรุณาให้ผู้ดูแลระบบเพิ่มอีเมลของคุณในข้อมูลเจ้าหน้าที่ แล้วเข้าสู่ระบบใหม่';
   panel.before(note);
 }
 // tabs this account may open (patients: no reports); the others are hidden and ignored, also when asked for by #hash

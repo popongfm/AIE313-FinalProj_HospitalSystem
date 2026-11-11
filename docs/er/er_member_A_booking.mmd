@@ -35,6 +35,7 @@ erDiagram
         varchar blood_type
         text allergy_note
         timestamptz created_at
+        uuid user_id FK
     }
     staff {
         int staff_id PK
@@ -45,6 +46,7 @@ erDiagram
         varchar license_no
         char phone
         varchar email
+        uuid user_id FK
     }
     department {
         int department_id PK

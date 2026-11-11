@@ -10,7 +10,13 @@ SELECT pg_temp.expect_state($$INSERT INTO patient(hn,national_id,first_name,last
 SELECT pg_temp.expect_state($$INSERT INTO staff(first_name,last_name,role) VALUES ('A','B','janitor')$$, '23514');
 SELECT pg_temp.expect_state($$DELETE FROM department WHERE name='Cardiology'$$, '23503');
 
+-- accounts are linked by user_id in patient / staff (no profiles table); one account per row
 INSERT INTO auth.users(id,email) VALUES ('00000000-0000-0000-0000-000000000001','p@x.th');
-SELECT pg_temp.expect_state($$INSERT INTO profiles(user_id,role,patient_id,staff_id) SELECT '00000000-0000-0000-0000-000000000001','patient',p.patient_id,s.staff_id FROM patient p, staff s$$, '23514');
-INSERT INTO profiles(user_id,role,patient_id) SELECT '00000000-0000-0000-0000-000000000001','patient',patient_id FROM patient WHERE hn='HN1';
+UPDATE patient SET user_id = '00000000-0000-0000-0000-000000000001' WHERE hn='HN1';
+SELECT pg_temp.expect_state($$INSERT INTO patient(hn,national_id,first_name,last_name,user_id) VALUES ('HN9','1100000000009','A','B','00000000-0000-0000-0000-000000000001')$$, '23505');
+SELECT pg_temp.expect_state($$UPDATE patient SET user_id = '00000000-0000-0000-0000-0000000000ff' WHERE hn='HN1'$$, '23503');
+DO $$ BEGIN ASSERT to_regclass('public.profiles') IS NULL, 'profiles table should be gone'; END $$;
+-- deleting the account keeps the medical record and only unlinks it
+DELETE FROM auth.users WHERE id = '00000000-0000-0000-0000-000000000001';
+DO $$ BEGIN ASSERT (SELECT user_id FROM patient WHERE hn='HN1') IS NULL, 'record must survive account deletion, unlinked'; END $$;
 SELECT 'core ok' AS result;

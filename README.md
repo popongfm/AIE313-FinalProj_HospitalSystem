@@ -8,8 +8,8 @@ Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS �
 Image ไม่มี key อยู่ข้างใน เพราะ `config.js` ถูกสร้างตอน container เริ่มทำงานจาก env ที่ตั้งใน Render จึงเปิด repo บน Docker Hub เป็น public ได้
 
 ### 1. Supabase
-1. สร้างโปรเจกต์ → SQL editor: รัน `schema.sql` แล้วตามด้วย `seed.sql` (22 ตาราง, 10 views, RLS, role `chat_reader`, ฟังก์ชัน `run_readonly_query`)
-   `schema.sql` รันได้ครั้งเดียวบนโปรเจกต์ที่ว่าง ถ้าเคยรันไปแล้ว (เช่นเจอ `already exists`) ให้สร้างโปรเจกต์ใหม่ หรือล้าง schema `public` ด้วยคำสั่งนี้ก่อน **ข้อมูลทุกตารางใน `public` จะหายรวมถึง `profiles`** (บัญชีใน Auth ยังอยู่ แต่ต้องผูก profile ใหม่) บรรทัด `ALTER DEFAULT PRIVILEGES` คืนสิทธิ์ตั้งต้นของ Supabase ถ้าไม่ใส่ `service_role` จะอ่าน `profiles` ไม่ได้และ chat จะตอบ 403 กับทุกบัญชี:
+1. สร้างโปรเจกต์ → SQL editor: รัน `schema.sql` แล้วตามด้วย `seed.sql` (21 ตาราง, 10 views, RLS, trigger ผูกบัญชีตอนสมัคร, role `chat_reader`, ฟังก์ชัน `run_readonly_query`)
+   `schema.sql` รันได้ครั้งเดียวบนโปรเจกต์ที่ว่าง ถ้าเคยรันไปแล้ว (เช่นเจอ `already exists`) ให้สร้างโปรเจกต์ใหม่ หรือล้าง schema `public` ด้วยคำสั่งนี้ก่อน **ข้อมูลทุกตารางใน `public` จะหาย รวมถึงการผูกบัญชี (`staff.user_id` / `patient.user_id`)** บัญชีใน Auth ยังอยู่ แต่ต้องผูกใหม่ (ลบบัญชีแล้วสมัครใหม่ หรือ `UPDATE ... SET user_id`) และต้องลบ trigger `on_auth_user_created` บน `auth.users` ก่อนด้วย (`DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;`) บรรทัด `ALTER DEFAULT PRIVILEGES` คืนสิทธิ์ตั้งต้นของ Supabase ถ้าไม่ใส่ `service_role` จะเรียก `role_of()` ไม่ได้และ chat จะตอบ 403 กับทุกบัญชี:
    ```sql
    DROP SCHEMA IF EXISTS public CASCADE;
    CREATE SCHEMA public;
@@ -20,22 +20,24 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
    ```
 2. SQL editor: `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
-   **อัปเดตโปรเจกต์ที่ลง schema ไปแล้ว:** รันไฟล์ใน `db/migrations/` ที่ยังไม่เคยรันตามลำดับวันที่ (แต่ละไฟล์เป็น transaction เดียว) **ก่อน** deploy Edge Function เวอร์ชันเดียวกัน เช่น `2026-11-10_patient_portal.sql` (สิทธิ์บัญชีผู้ป่วย) แล้วตามด้วย `2026-11-10b_upcoming_bookings.sql` (view นัดหมายตั้งแต่วันนี้) โปรเจกต์ใหม่ใช้แค่ `schema.sql` + `seed.sql`
+   **อัปเดตโปรเจกต์ที่ลง schema ไปแล้ว:** รันไฟล์ใน `db/migrations/` ที่ยังไม่เคยรันตามลำดับวันที่ (แต่ละไฟล์เป็น transaction เดียว) **ก่อน** deploy Edge Function เวอร์ชันเดียวกัน เช่น `2026-11-10_patient_portal.sql` (สิทธิ์บัญชีผู้ป่วย) แล้วตามด้วย `2026-11-10b_upcoming_bookings.sql` (view นัดหมายตั้งแต่วันนี้) และ `2026-11-11_user_link_trigger.sql` (เลิกใช้ `profiles` ย้ายการผูกบัญชีเดิมไป `staff.user_id` / `patient.user_id` และเพิ่ม trigger สมัครสมาชิก) โปรเจกต์ใหม่ใช้แค่ `schema.sql` + `seed.sql`
 3. **Auth** (หน้าเว็บมีปุ่มสมัครสมาชิกตามที่โจทย์กำหนด):
    - Authentication → Sign In / Providers: **เปิด "Allow new users to sign up"** ไว้
    - **"Confirm email"**: สำหรับ demo ให้ปิดไว้ เพราะ SMTP เริ่มต้นของ Supabase ส่งอีเมลยืนยันได้เฉพาะอีเมลของสมาชิกในโปรเจกต์ ถ้าจะเปิดไว้ต้องตั้ง SMTP เอง
    - หลังได้ URL จาก Render (ขั้นที่ 3) ให้ใส่ใน Authentication → URL Configuration: **Site URL** และ **Redirect URLs** = `https://<ชื่อ service>.onrender.com`
-   - บัญชีที่สมัครใหม่ **ยังไม่เห็นข้อมูล** (RLS, view และ chat เช็คสิทธิ์ทั้งหมด) จนกว่า admin จะผูกบัญชีกับ profile ใน SQL editor (ดู uuid ได้ที่ Authentication → Users):
-     `INSERT INTO profiles(user_id, role) VALUES ('<auth user uuid>', 'admin');`
-     `INSERT INTO profiles(user_id, role, staff_id) VALUES ('<auth user uuid>', 'doctor', <staff_id>);` (หรือ `pharmacist` / `nurse`)
-     `INSERT INTO profiles(user_id, role, patient_id) VALUES ('<auth user uuid>', 'patient', <patient_id>);` (บัญชีผู้ป่วย)
-   - สิทธิ์ตาม profile:
+   - **ไม่ต้อง copy UUID เอง:** หน้าสมัคร (`register.html`) ให้เลือก "ผู้ป่วย / เจ้าหน้าที่" แล้ว trigger `handle_new_user` บน `auth.users` (`db/01_core.sql`) ผูกบัญชีให้ใน transaction เดียวกับการสมัคร
+     - **ผู้ป่วย** กรอกชื่อ เลขบัตรประชาชน วันเกิด: ถ้าเลขบัตร + วันเกิดตรงกับเวชระเบียนเดิม ผูกกับแถวเดิม (HN เดิม) ถ้าไม่มี สร้างแถว `patient` ใหม่พร้อม HN ใหม่ ถ้าเลขบัตรนี้มีบัญชีแล้วหรือวันเกิดไม่ตรง การสมัครถูกยกเลิกทั้งหมด
+     - **เจ้าหน้าที่** ผูกกับแถว `staff` ที่มีอีเมลเดียวกัน (admin เพิ่มแถวไว้ก่อน หรือเพิ่มทีหลังก็ได้ trigger ฝั่ง `staff` จะผูกบัญชีที่รออยู่ให้) ถ้ายังไม่มีอีเมลนี้ บัญชีจะรอและไม่เห็นข้อมูล (RLS, view และ chat เช็คสิทธิ์ทั้งหมด) การสมัครเองจึงไม่มีทางได้สิทธิ์เจ้าหน้าที่
+     - **admin สำหรับ demo:** `seed.sql` มีแถว `staff` role `admin` อีเมล `admin@hospital.example` สมัครด้วยอีเมลนี้แล้วเป็น admin ทันที (เจ้าหน้าที่ใน seed ใช้ `staff1@hospital.example` … `staff20@hospital.example`)
+     - เพิ่มเจ้าหน้าที่ใหม่ (SQL editor หรือ Table editor): `INSERT INTO staff(first_name, last_name, role, department_id, email) VALUES ('ชื่อ', 'สกุล', 'nurse', 8, 'nurse@example.com');`
+     - เปลี่ยน role / อีเมลเจ้าหน้าที่ หรือผูก/ตัดบัญชี (`user_id`) ทำได้เฉพาะ admin หรือ SQL editor (trigger `trg_account_link_guard`)
+   - สิทธิ์ตามบัญชี (role มาจาก `staff.role` หรือเป็น `patient` เมื่อผูกกับ `patient.user_id`; ดูด้วย `my_role()`):
 
      | บัญชี | ตาราง (CRUD) | รายงาน / Dashboard / Chat |
      |---|---|---|
-     | ไม่มี profile | ไม่เห็นอะไร | ไม่เห็นอะไร / chat ตอบ 403 |
+     | ยังไม่ได้ผูก | ไม่เห็นอะไร | ไม่เห็นอะไร / chat ตอบ 403 |
      | `patient` | เห็นเฉพาะของตัวเองใน `patient`, `booking`, `visit`, `prescription`; จองคิว (ระบบใส่เลขคิวให้) และยกเลิกคิวของตัวเอง; แก้ได้เฉพาะเบอร์โทร อีเมล ที่อยู่ | ไม่มีแท็บรายงาน; Dashboard แสดงค่ารักษารายเดือนของตัวเอง; chat ตอบจาก view รายคน (เฉพาะของตัวเอง) และ view ภาพรวม |
-     | `admin`, `doctor`, `pharmacist`, `nurse` | ทุกตาราง | รายงานทุกแถว; Dashboard ตาม role (admin ทุกกราฟ D1–D5, doctor D1 D4, nurse D4 D1, pharmacist D5 D3) |
+     | `admin`, `doctor`, `pharmacist`, `nurse`, `technician` | ทุกตาราง (role/อีเมล/การผูกบัญชีของ staff แก้ได้เฉพาะ admin) | รายงานทุกแถว; Dashboard ตาม role (admin ทุกกราฟ D1–D5, doctor D1 D4, nurse D4 D1, pharmacist D5 D3) |
 4. **Edge Functions** (ต้องมี Supabase CLI: `brew install supabase/tap/supabase` แล้ว `supabase login`) รันในโฟลเดอร์ repo
    chat หลักคือ **MCP (วิธี C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, วิธี B) เป็นตัวสำรอง:
    `supabase functions deploy chat-mcp --project-ref <ref>` (และ `chat` ถ้าต้องการ)

@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>โรงพยาบาล AIE313 - สมัครสมาชิก</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Serif+Thai:wght@500;600&display=swap">
+  <link rel="stylesheet" href="css/app.css">
+  <script src="config.js"></script>
+</head>
+<body class="site">
+  <div class="utility">
+    <div class="wrap">
+      <span>ข้อมูลผู้ป่วยและบุคลากรในระบบนี้เป็นข้อมูลจำลองเพื่อการเรียนการสอน</span>
+      <a href="https://github.com/popongfm/AIE313-FinalProj_HospitalSystem">ดูโค้ดบน GitHub</a>
+    </div>
+  </div>
+
+  <header class="site-bar">
+    <div class="wrap">
+      <a class="brand" href="index.html" aria-label="โรงพยาบาล AIE313 หน้าแรก">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z"/></svg>
+        <span class="brand-name">โรงพยาบาล AIE313<small>ระบบสารสนเทศโรงพยาบาล</small></span>
+      </a>
+      <a class="btn primary push-right" href="index.html#signin">เข้าสู่ระบบ</a>
+    </div>
+  </header>
+
+  <main class="register wrap">
+    <div class="reg-card">
+      <h1>สมัครสมาชิก</h1>
+      <p class="lead">เลือกว่าคุณสมัครในฐานะใด ระบบจะผูกบัญชีกับข้อมูลของคุณในโรงพยาบาลให้อัตโนมัติ</p>
+
+      <form id="reg" novalidate>
+        <fieldset class="account-type">
+          <legend>สมัครในฐานะ</legend>
+          <label><input type="radio" name="account_type" value="patient" checked><span><strong>ผู้ป่วย</strong><small>ดูประวัติของตัวเอง จองคิว</small></span></label>
+          <label><input type="radio" name="account_type" value="staff"><span><strong>เจ้าหน้าที่</strong><small>แพทย์ พยาบาล เภสัชกร ผู้ดูแลระบบ</small></span></label>
+        </fieldset>
+
+        <div id="patient-fields" class="grid2">
+          <div><label for="first_name">ชื่อ</label><input id="first_name" autocomplete="given-name" maxlength="100" data-patient required></div>
+          <div><label for="last_name">นามสกุล</label><input id="last_name" autocomplete="family-name" maxlength="100" data-patient required></div>
+          <div><label for="national_id">เลขบัตรประชาชน (13 หลัก)</label><input id="national_id" inputmode="numeric" pattern="[0-9]{13}" maxlength="13" data-patient required></div>
+          <div><label for="birth_date">วันเกิด</label><input id="birth_date" type="date" autocomplete="bday" data-patient required></div>
+          <div><label for="phone">โทรศัพท์ (10 หลัก, ไม่บังคับ)</label><input id="phone" type="tel" inputmode="numeric" pattern="[0-9]{10}" maxlength="10" autocomplete="tel" data-patient></div>
+          <p class="hint full">เคยมาโรงพยาบาลแล้ว: ใช้เลขบัตรและวันเกิดเดียวกับในเวชระเบียน ระบบจะผูกบัญชีกับประวัติเดิม (HN เดิม) ให้ ถ้ายังไม่เคยมา ระบบจะออก HN ใหม่</p>
+        </div>
+        <p id="staff-hint" class="hint" hidden>ใช้อีเมลเดียวกับที่ผู้ดูแลระบบบันทึกไว้ในข้อมูลเจ้าหน้าที่ ระบบจะผูกบัญชีกับตำแหน่งของคุณ (แพทย์ พยาบาล เภสัชกร ฯลฯ) ให้ทันที ถ้ายังไม่มีอีเมลนี้ในระบบ บัญชีจะรอจนกว่าผู้ดูแลระบบจะเพิ่มอีเมลให้</p>
+
+        <div class="grid2">
+          <div class="full"><label for="email">อีเมล</label><input id="email" type="email" required autocomplete="email"></div>
+          <div><label for="password">รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)</label><input id="password" type="password" required minlength="6" autocomplete="new-password"></div>
+          <div><label for="password2">ยืนยันรหัสผ่าน</label><input id="password2" type="password" required minlength="6" autocomplete="new-password"></div>
+        </div>
+
+        <div id="err" class="err" role="alert"></div>
+        <div id="ok" class="ok" role="status"></div>
+        <div class="row">
+          <button class="primary" type="submit" id="submit">สมัครสมาชิก</button>
+          <a class="btn" href="index.html#signin">มีบัญชีแล้ว? เข้าสู่ระบบ</a>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <footer class="site-foot">
+    <div class="wrap">
+      <span class="brand-name">โรงพยาบาล AIE313<small>ระบบสารสนเทศโรงพยาบาล</small></span>
+      <p>โปรเจกต์กลุ่ม รายวิชา AIE313 ระบบฐานข้อมูล มหาวิทยาลัยกรุงเทพ<br>ข้อมูลผู้ป่วยและบุคลากรทั้งหมดเป็นข้อมูลจำลอง</p>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { signUp } from './js/auth.js';
+    import { registrationProblem } from './js/authMessages.js';
+    const $ = (id) => document.getElementById(id);
+    const form = $('reg');
+    const type = () => form.elements.account_type.value;
+    const show = (errText, okText) => { $('err').textContent = errText || ''; $('ok').textContent = okText || ''; };
+
+    // patient fields only for patients (hidden fields must not block submitting as staff)
+    function syncType() {
+      const patient = type() === 'patient';
+      $('patient-fields').hidden = !patient;
+      $('staff-hint').hidden = patient;
+      form.querySelectorAll('[data-patient]').forEach((el) => { el.disabled = !patient; });
+    }
+    form.querySelectorAll('input[name=account_type]').forEach((r) => r.addEventListener('change', () => { show(); syncType(); }));
+    syncType();
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      show();
+      const v = (id) => $(id).value.trim();
+      // what the sign-up trigger (handle_new_user) reads from raw_user_meta_data
+      const person = type() === 'patient'
+        ? { account_type: 'patient', first_name: v('first_name'), last_name: v('last_name'), national_id: v('national_id'), birth_date: v('birth_date'), phone: v('phone') }
+        : { account_type: 'staff' };
+      const problem = registrationProblem(person, $('password').value, $('password2').value);
+      if (problem) return show(problem);
+      if (!form.reportValidity()) return;
+      $('submit').disabled = true;
+      try {
+        const r = await signUp(v('email'), $('password').value, person);
+        if (!r.ok) return show(r.error);
+        if (r.role) { location.href = 'app.html'; return; }   // linked at once (confirm-email off)
+        show('', r.message);
+        form.querySelectorAll('input:not([type=radio]), button[type=submit]').forEach((el) => { el.disabled = true; });
+      } finally { if (!$('ok').textContent) $('submit').disabled = false; }
+    });
+  </script>
+</body>
+</html>

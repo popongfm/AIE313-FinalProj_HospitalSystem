@@ -28,7 +28,8 @@ INSERT INTO staff (staff_id, first_name, last_name, role, department_id, license
   (17, 'สมชาย', 'วงศ์ใหญ่', 'nurse', 8, 'NUR-017', '0987707568', 'staff17@hospital.example'),
   (18, 'สมหญิง', 'ทองดี', 'nurse', 8, 'NUR-018', '0963435561', 'staff18@hospital.example'),
   (19, 'วิชัย', 'ศรีสุข', 'technician', 7, 'TEC-019', '0927269122', 'staff19@hospital.example'),
-  (20, 'สุดา', 'ใจดี', 'technician', 7, 'TEC-020', '0956508117', 'staff20@hospital.example');
+  (20, 'สุดา', 'ใจดี', 'technician', 7, 'TEC-020', '0956508117', 'staff20@hospital.example'),
+  (21, 'ผู้ดูแล', 'ระบบ', 'admin', NULL, NULL, NULL, 'admin@hospital.example');
 INSERT INTO patient (patient_id, hn, national_id, first_name, last_name, birth_date, gender, phone, email, address, blood_type, allergy_note) VALUES
   (1, 'HN0001', '1000000000001', 'สมชาย', 'ศรีสุข', '1969-12-21', 'M', '0821353864', 'patient1@example.com', 'กรุงเทพฯ เขต 2', 'A+', NULL),
   (2, 'HN0002', '1000000000002', 'สมหญิง', 'ทองดี', '1950-03-18', 'F', '0894268329', 'patient2@example.com', 'กรุงเทพฯ เขต 3', 'A+', NULL),
