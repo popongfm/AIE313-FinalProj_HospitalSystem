@@ -1,5 +1,7 @@
 import { supabase } from './supabaseClient.js';
 import { renderTable } from './table.js';
+import { button } from './ui.js';
+import { icon } from './icons.js';
 
 const history = [];   // survives tab switches within the page session
 const EXAMPLES = ['แพทย์คนไหนมีคิวจองมากที่สุด', 'ค่ารักษารวมแยกตามแผนก', 'ยาอะไรต้องสั่งซื้อเพิ่ม', 'วันนี้มีคิวนัดอะไรบ้าง', 'ขอนัดพบแพทย์สัปดาห์หน้า'];
@@ -30,26 +32,35 @@ function bookingCard(entry, onConfirm, onCancel) {
   const r = (entry.rows && entry.rows[0]) || {};
   const line = (label, value) => { if (value == null || value === '') return; const p = document.createElement('div');
     const b = document.createElement('strong'); b.textContent = label + ': '; p.append(b, String(value)); box.appendChild(p); };
-  const h = document.createElement('div'); h.className = 'booking-title'; h.textContent = 'นัดหมายที่จะบันทึก'; box.appendChild(h);
+  const h = document.createElement('div'); h.className = 'booking-title'; h.append(icon('calendar'), document.createTextNode('นัดหมายที่จะบันทึก')); box.appendChild(h);
   line('ผู้ป่วย', [r.hn, r.patient_name].filter(Boolean).join(' '));
   line('แพทย์', [r.doctor_name, r.department && `(${r.department})`].filter(Boolean).join(' '));
   line('วันที่', r.booking_date); line('เวลา', r.booking_time && r.booking_time + ' น. (เวลาไทย GMT+7)'); line('คิวที่ (โดยประมาณ)', r.queue_no); line('อาการ', r.symptom);
   const row = document.createElement('div'); row.className = 'row';
   if (entry.actionState === 'done') { const s = document.createElement('div'); s.className = 'ok'; s.textContent = 'บันทึกแล้ว'; box.appendChild(s); return box; }
   if (entry.actionState === 'cancelled') { const s = document.createElement('div'); s.className = 'hint'; s.textContent = 'ยกเลิกแล้ว ไม่ได้บันทึก'; box.appendChild(s); return box; }
-  const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'primary confirm-booking'; yes.textContent = entry.actionState === 'sending' ? 'กำลังบันทึก…' : 'ยืนยันนัด';
-  const no = document.createElement('button'); no.type = 'button'; no.className = 'cancel-booking'; no.textContent = 'ยกเลิก';
+  const yes = button(entry.actionState === 'sending' ? 'กำลังบันทึก…' : 'ยืนยันนัด', { icon: 'check', variant: 'primary' }); yes.classList.add('confirm-booking');
+  const no = button('ยกเลิก'); no.classList.add('cancel-booking');
   yes.disabled = no.disabled = entry.actionState === 'sending';
   yes.onclick = onConfirm; no.onclick = onCancel;
   row.append(yes, no); box.appendChild(row);
   return box;
 }
 
+// the assistant's mark next to its replies
+function avatar() { const a = document.createElement('span'); a.className = 'avatar'; a.setAttribute('aria-hidden', 'true'); a.textContent = '+'; return a; }
 function bubble(entry, actions) {
   const div = document.createElement('div');
   div.className = 'msg ' + (entry.role === 'user' ? 'user' : 'bot');
   if (entry.role === 'user') { div.textContent = entry.text; return div; }
-  if (entry.pending) { div.textContent = 'กำลังประมวลผล…'; return div; }
+  const turn = document.createElement('div'); turn.className = 'turn'; turn.append(avatar(), div);
+  if (entry.pending) {   // typing indicator; the words are for everyone, the dots are decoration
+    div.classList.add('pending');
+    const dots = document.createElement('span'); dots.className = 'dots'; dots.setAttribute('aria-hidden', 'true');
+    for (let i = 0; i < 3; i++) { const d = document.createElement('span'); d.className = 'dot'; dots.appendChild(d); }
+    const t = document.createElement('span'); t.textContent = 'กำลังประมวลผล…';
+    div.append(dots, t); return turn;
+  }
   if (entry.error) { const e = document.createElement('div'); e.className = 'err'; e.textContent = entry.error; div.appendChild(e); }
   // answers are plain text (textContent, never HTML); drop Markdown bold/heading marks a model may still add
   if (entry.answer) { const p = document.createElement('div'); p.className = 'answer'; p.textContent = String(entry.answer).replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,6}\s+/gm, ''); div.appendChild(p); }
@@ -59,13 +70,15 @@ function bubble(entry, actions) {
     const pre = document.createElement('pre'); pre.textContent = entry.sql; d.append(s, pre); div.appendChild(d);
   }
   if (!entry.error && !entry.action && entry.answer && entry.rows && entry.rows.length) div.appendChild(renderTable(entry.rows));   // raw data
-  return div;
+  return turn;
 }
 
 export async function mountChat(el) {
-  el.innerHTML = '<div class="card"><div id="log" aria-live="polite"></div>'
-    + '<form id="chatform" class="row"><input id="q" maxlength="500" placeholder="พิมพ์คำถามเป็นภาษาไทยหรืออังกฤษ" style="flex:1;min-width:220px" autocomplete="off">'
-    + '<button class="primary" id="send" type="submit">ส่ง</button></form><div id="ex" class="row"></div></div>';
+  el.innerHTML = '<div class="card chat-card"><div id="log" aria-live="polite"></div>'
+    + '<form id="chatform" class="composer"><input id="q" maxlength="500" placeholder="พิมพ์คำถามเป็นภาษาไทยหรืออังกฤษ" autocomplete="off" aria-label="คำถาม"></form>'
+    + '<div id="ex" class="chips" aria-label="ตัวอย่างคำถาม"></div></div>';
+  const sendBtn = button('ส่ง', { icon: 'send', variant: 'primary', type: 'submit' }); sendBtn.id = 'send';
+  el.querySelector('#chatform').appendChild(sendBtn);
   const log = el.querySelector('#log'), input = el.querySelector('#q'), send = el.querySelector('#send');
   const actions = {
     // the user confirmed: save it (the Edge Function calls chat_book_appointment as this user, no LLM involved)
@@ -78,7 +91,11 @@ export async function mountChat(el) {
     },
     cancel(entry) { if (!entry.actionState) { entry.actionState = 'cancelled'; render(); } },
   };
-  const render = () => { log.replaceChildren(...history.map((e) => bubble(e, actions))); log.lastElementChild?.scrollIntoView({ block: 'nearest' }); };
+  const hint = () => { const h = document.createElement('p'); h.className = 'chat-empty'; h.textContent = 'ถามเรื่องคิว นัดหมาย ค่ารักษา หรือสต็อกยาได้เลย หรือเลือกคำถามตัวอย่างด้านล่าง'; return h; };
+  const render = () => {
+    log.replaceChildren(...(history.length ? history.map((e) => bubble(e, actions)) : [hint()]));
+    log.scrollTop = log.scrollHeight;   // newest message in view, inside the chat box
+  };
   EXAMPLES.forEach((t) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = t; b.onclick = () => { input.value = t; input.focus(); }; el.querySelector('#ex').appendChild(b); });
 
   el.querySelector('#chatform').addEventListener('submit', async (e) => {

@@ -297,17 +297,34 @@ table.has-actions tbody tr:hover td:last-child { background: color-mix(in srgb, 
 @media (max-width: 720px) { .card > .row.picker select { min-width: 0; flex: 1; } }
 
 /* chat */
-#log { min-height: 200px; }
-.msg { width: fit-content; max-width: 80%; padding: 12px 14px; border-radius: 14px; margin: 10px 0; white-space: pre-wrap; }
+.chat-card { display: flex; flex-direction: column; gap: var(--s4); }
+#log { min-height: 320px; max-height: max(320px, calc(100vh - var(--appbar-h) - 330px)); overflow-y: auto; padding: var(--s2) var(--s1);
+  display: flex; flex-direction: column; gap: var(--s3); }
+.chat-empty { margin: auto; color: var(--muted); text-align: center; max-width: 28em; }
+.turn { display: flex; align-items: flex-start; gap: 10px; }
+.avatar { display: grid; place-items: center; flex: none; width: 30px; height: 30px; margin-top: 4px; border-radius: 9px; background: var(--scrub); color: var(--scrub-ink);
+  font: 700 20px/1 var(--f-body); }
+.msg { width: fit-content; max-width: 80%; padding: 12px 16px; border-radius: 16px; white-space: pre-wrap; }
+.turn .msg { max-width: calc(100% - 40px); margin: 0; }
 .msg.user { background: var(--scrub); color: var(--scrub-ink); margin-left: auto; border-bottom-right-radius: 4px; }
-.msg.bot { background: var(--paper); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+.msg.bot { background: var(--mist); border: 1px solid var(--line); border-top-left-radius: 4px; }
+.msg.bot .err { margin: 0; background: var(--danger-soft); padding: 8px 12px; border-radius: var(--r-sm); }
+.msg.pending { display: inline-flex; align-items: center; gap: 10px; color: var(--muted); }
+.dots { display: inline-flex; gap: 4px; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--scrub); animation: blink 1.2s infinite ease-in-out both; }
+.dot:nth-child(2) { animation-delay: .15s; } .dot:nth-child(3) { animation-delay: .3s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dot { animation: none; opacity: .6; } }
 .msg .tablewrap { margin-top: 10px; max-height: 320px; }
 .msg pre { white-space: pre-wrap; overflow-wrap: anywhere; }
-details { margin-top: 8px; }
-summary { cursor: pointer; color: var(--scrub); font-weight: 500; font-size: 14px; }
-pre { overflow-x: auto; background: var(--mist); border: 1px solid var(--line); padding: 10px 12px; border-radius: 8px; margin: 6px 0 0; font-size: 13px; white-space: pre; }
-#chatform { margin: 16px 0 8px; }
-#ex button { min-height: var(--h-sm); border-radius: 999px; padding: 0 14px; font-size: 14px; background: var(--mist); }
+details { margin-top: 10px; }
+summary { cursor: pointer; color: var(--scrub); font-weight: 500; font-size: 14px; width: fit-content; }
+pre { overflow-x: auto; background: var(--paper); border: 1px solid var(--line); padding: 10px 12px; border-radius: var(--r-sm); margin: 6px 0 0; font-size: 13px; white-space: pre; }
+.composer { display: flex; gap: var(--s2); margin: 0; padding-top: var(--s4); border-top: 1px solid var(--line); }
+.composer input { flex: 1; min-width: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: var(--s2); }
+#ex button { min-height: var(--h-sm); border-radius: 999px; padding: 0 14px; font-size: 14px; background: var(--paper); color: var(--muted); }
+#ex button:hover { color: var(--ink); border-color: var(--scrub); }
 
 /* dashboard: two columns, the monthly billing chart (D2) gets the full width */
 .charts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-flow: dense; gap: 20px; }
@@ -353,10 +370,10 @@ pre { overflow-x: auto; background: var(--mist); border: 1px solid var(--line); 
 @media (max-width: 560px) { .reg-card { padding: 22px; } .grid2, .account-type { grid-template-columns: 1fr; } }
 
 /* chat: appointment proposed by the AI assistant, saved only after "ยืนยันนัด" */
-.booking-card { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--scrub); border-radius: 10px; background: var(--scrub-soft); }
-.booking-card .booking-title { font-weight: 600; margin-bottom: 6px; }
+.booking-card { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--line); border-left: 5px solid var(--z-appt); border-radius: var(--r-md); background: var(--paper); white-space: normal; }
+.booking-card .booking-title { display: flex; align-items: center; gap: 8px; font-weight: 600; margin-bottom: 8px; color: var(--info); }
 .booking-card > div { margin: 2px 0; }
-.booking-card .row { margin-top: 10px; }
+.booking-card .row { margin: 12px 0 0; }
 
 /* time zone of the whole system (js/clock.js): Thailand, Asia/Bangkok (GMT+7) */
 .tz-badge { white-space: nowrap; font-variant-numeric: tabular-nums; }

@@ -118,10 +118,13 @@ await check('app header shows the Thai time zone', async () => {
 await check('chat: answer, SQL evidence and raw table are shown; input disabled while processing', async () => {
   await page.click('[data-tab=chat]'); await page.fill('#q', 'มีแพทย์กี่คน'); await page.click('#send');
   assert.equal(await page.isDisabled('#send'), true); assert.ok((await page.textContent('#log')).includes('กำลังประมวลผล'));
+  assert.equal(await page.locator('#log .msg.bot.pending .dot').count(), 3);
   await page.waitForFunction(() => document.querySelector('#log').textContent.includes('มีแพทย์ 8 คน'));
   assert.ok((await page.textContent('#log')).includes('มีแพทย์กี่คน'));
   assert.ok((await page.textContent('#log details')).includes('select count(*)'));
   assert.ok((await page.textContent('#log table')).includes('8')); assert.equal(await page.isDisabled('#send'), false); });
+await check('chat: example chip fills the question box', async () => {
+  await page.click('#ex button >> nth=0'); assert.equal(await page.inputValue('#q'), 'แพทย์คนไหนมีคิวจองมากที่สุด'); await page.fill('#q', ''); });
 await check('chat: refused dangerous question shows the reason and no table', async () => {
   await page.fill('#q', 'ลบข้อมูลผู้ป่วยทั้งหมด'); await page.click('#send');
   await page.waitForFunction(() => document.querySelector('#log').textContent.includes('อนุญาตเฉพาะคำสั่ง SELECT'));
