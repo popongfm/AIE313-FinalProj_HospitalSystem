@@ -220,18 +220,25 @@ button[data-armed="1"], button[data-armed="1"]:hover { border-color: var(--dange
 }
 
 /* ---------- Staff app (app.html) ---------- */
-.app-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 28px; padding: 0 max(24px, calc((100% - var(--wrap)) / 2 + 24px)); min-height: 68px;
+.app-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; padding: 0 max(24px, calc((100% - var(--wrap)) / 2 + 24px)); min-height: 68px;
   background: var(--deep); color: var(--on-deep); position: sticky; top: 0; z-index: 10; }
 .app-bar .brand { color: var(--on-deep); }
 .app-bar .brand-mark rect { fill: #ffffff; }
 .app-bar .brand-mark path { fill: #0f6b5e; }
 .app-bar .brand-name small { color: var(--on-deep-muted); }
 .app-bar nav { display: flex; flex-wrap: wrap; align-self: stretch; gap: 4px; margin-right: auto; }
-.app-bar nav button { border: 0; border-radius: 0; background: transparent; padding: 0 14px; color: var(--on-deep-muted); border-bottom: 3px solid transparent; border-top: 3px solid transparent; }
-.app-bar nav button:hover { color: var(--on-deep); }
+.app-bar nav button { min-height: 0; border: 0; border-radius: 0; background: transparent; padding: 0 14px; color: var(--on-deep-muted);
+  border-bottom: 3px solid transparent; border-top: 3px solid transparent; transform: none; }
+.app-bar nav button:hover { color: var(--on-deep); background: rgb(255 255 255 / .06); }
 .app-bar nav button.active { color: var(--on-deep); border-bottom-color: var(--mint); font-weight: 600; }
-#logout { background: transparent; color: var(--on-deep); border-color: rgba(255, 255, 255, .35); }
-#logout:hover { border-color: var(--on-deep); }
+.app-bar nav button.active .icon { color: var(--mint); }
+.app-bar :focus-visible { outline-color: var(--mint); }
+.role-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px 4px 8px; border-radius: 999px; background: rgb(255 255 255 / .1);
+  color: var(--on-deep); font-size: 14px; font-weight: 500; white-space: nowrap; }
+.role-chip .icon { width: 16px; height: 16px; color: var(--mint); }
+#logout { color: var(--on-deep); min-height: 38px; width: 38px; padding: 0; margin-left: -12px; }
+#logout .icon { width: 20px; height: 20px; }
+#logout:hover { background: rgb(255 255 255 / .1); }
 .app main { max-width: var(--wrap); margin: 0 auto; padding: 28px 24px 48px; }
 .page-head { margin: 0 0 20px; }
 .page-head h1 { font-size: 30px; margin: 0 0 2px; }
@@ -285,8 +292,10 @@ pre { overflow-x: auto; background: var(--mist); border: 1px solid var(--line); 
 @media (max-width: 720px) {
   .app-bar { padding: 8px 16px 0; gap: 4px 12px; }
   .app-bar nav { order: 3; width: 100%; overflow-x: auto; flex-wrap: nowrap; justify-content: space-between; }
-  .app-bar nav button { white-space: nowrap; padding: 10px 4px; font-size: 14px; }
-  #logout { margin-left: auto; padding: 6px 12px; font-size: 14px; }
+  .app-bar nav button { white-space: nowrap; padding: 10px 6px; font-size: 14px; gap: 6px; }
+  .app-bar nav .icon { width: 16px; height: 16px; }
+  .role-chip { display: none; }
+  #logout { margin-left: auto; min-height: 36px; width: 36px; }
   .app main { padding: 20px 16px 40px; }
   .page-head h1 { font-size: 24px; }
   .card { padding: 16px; }

@@ -62,6 +62,9 @@ await check('register: an account the trigger linked goes straight into the app'
 await check('correct password reaches app (approved account, no pending notice)', async () => {
   await page.fill('#email', 'a@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html'); await page.waitForSelector('#panel table');
   assert.equal(await page.locator('#pending').count(), 0); });
+await check('app bar shows the account role', async () => { assert.equal(await page.textContent('#role-chip'), 'ผู้ดูแลระบบ'); });
+await check('clicking the icon inside a nav button switches tab', async () => {
+  await page.click('[data-tab=views] svg'); await page.waitForSelector('#v'); await page.click('[data-tab=data] svg'); await page.waitForSelector('#panel table'); });
 await check('CRUD list shows patient row', async () => { assert.ok((await page.textContent('#panel table')).includes('HN1')); });
 await check('delete patient with dependents shows Thai FK error', async () => {
   const del = page.locator('#panel button', { hasText: 'ลบ' }).first(); await del.click(); await page.locator('#panel button', { hasText: 'ยืนยันลบ?' }).click();
@@ -140,6 +143,7 @@ await check('patient account: own-record tables only, book with a doctor list, n
   await page.fill('#email', 'pt@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html*');
   await page.waitForSelector('#t'); assert.equal(await page.locator('#pending').count(), 0);
   assert.equal(await page.textContent('#page-title'), 'ข้อมูลของฉัน');
+  assert.equal(await page.textContent('#role-chip'), 'ผู้ป่วย');
   assert.deepEqual(await page.$$eval('#t option', (o) => o.map((x) => x.value)), ['patient', 'booking', 'visit', 'prescription']);
   assert.equal(await page.isVisible('#new'), false, 'patients cannot add patient rows');
   await page.selectOption('#t', 'visit'); await page.waitForSelector('#list table');

@@ -15,13 +15,14 @@
       <span class="brand-name">โรงพยาบาล AIE313<small>ระบบสารสนเทศโรงพยาบาล</small></span>
     </a>
     <nav id="nav" aria-label="เมนูระบบ">
-      <button data-tab="data" class="active">ข้อมูล</button>
-      <button data-tab="views" hidden>รายงาน (Views)</button>
-      <button data-tab="dash">Dashboard</button>
-      <button data-tab="chat">Chat</button>
+      <button data-tab="data" class="active"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M9.5 9.5v10"/></svg><span>ข้อมูล</span></button>
+      <button data-tab="views" hidden><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="4.5" width="14" height="17" rx="2"/><path d="M9 4.5V3h6v1.5M8.5 10h7M8.5 14h7M8.5 18h4"/></svg><span>รายงาน</span></button>
+      <button data-tab="dash"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 20.5h16M7 17v-6M12 17V6.5M17 17v-3.5"/></svg><span>Dashboard</span></button>
+      <button data-tab="chat"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4.5 5.5h15v10.5h-8l-4.5 3.5V16h-2.5z"/><path d="M8.5 9.5h7M8.5 12.5h4.5"/></svg><span>ผู้ช่วย AI</span></button>
     </nav>
     <span id="tz-clock" aria-live="off"></span>
-    <button id="logout">ออกจากระบบ</button>
+    <span id="role-chip" class="role-chip" hidden></span>
+    <button id="logout" class="ghost" title="ออกจากระบบ"><svg class="icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M14 4.5H6.5a2 2 0 00-2 2v11a2 2 0 002 2H14M10 12h10M16.5 8.5L20 12l-3.5 3.5"/></svg><span class="visually-hidden">ออกจากระบบ</span></button>
   </header>
   <main>
     <div class="page-head"><h1 id="page-title"></h1><p id="page-desc"></p></div>
