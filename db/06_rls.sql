@@ -22,10 +22,22 @@ END $$;
 -- staff.user_id / patient.user_id link accounts, staff.role decides what a staff account may see, and staff.email is
 -- what a new staff account is matched on at sign-up. Other staff can still edit names, phones, departments, etc.
 -- The sign-up trigger, the SQL editor and service_role have no signed-in user, so they pass.
-CREATE FUNCTION trg_account_link_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+-- TRUE while Supabase deletes this account: auth.users no longer has it, and ON DELETE SET NULL is unlinking the row
+-- that pointed at it. That unlink must always pass, otherwise deleting the account fails and its old token keeps
+-- working (the JWT on the connection may even be the deleted user's own).
+CREATE FUNCTION is_account_unlink_on_delete(old_row jsonb, new_row jsonb) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT old_row->>'user_id' IS NOT NULL AND new_row->>'user_id' IS NULL
+     AND (old_row - 'user_id') = (new_row - 'user_id')
+     AND NOT EXISTS (SELECT 1 FROM auth.users WHERE id = (old_row->>'user_id')::uuid) $$;
+REVOKE ALL ON FUNCTION is_account_unlink_on_delete(jsonb, jsonb) FROM PUBLIC, anon, authenticated;
+
+-- Security definer: Supabase Auth's role (supabase_auth_admin) fires these triggers too, through the foreign keys.
+CREATE FUNCTION trg_account_link_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE n jsonb := to_jsonb(NEW); o jsonb;
 BEGIN
   IF no_signed_in_user() OR is_admin() THEN RETURN NEW; END IF;
+  IF TG_OP = 'UPDATE' AND is_account_unlink_on_delete(to_jsonb(OLD), n) THEN RETURN NEW; END IF;
   IF TG_OP = 'INSERT' THEN
     IF n->>'user_id' IS NOT NULL OR n->>'role' = 'admin' THEN
       RAISE EXCEPTION 'only an admin may link an account or create an admin' USING ERRCODE = 'insufficient_privilege';
@@ -58,8 +70,9 @@ CREATE POLICY prescription_own_read ON prescription FOR SELECT TO authenticated
   USING (EXISTS (SELECT 1 FROM visit v WHERE v.visit_id = prescription.visit_id AND v.patient_id = my_patient_id()));
 
 -- A patient may change only its contact details (phone, email, address).
-CREATE FUNCTION trg_patient_self_update_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+CREATE FUNCTION trg_patient_self_update_guard() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 BEGIN
+  IF is_account_unlink_on_delete(to_jsonb(OLD), to_jsonb(NEW)) THEN RETURN NEW; END IF;   -- account being deleted
   IF NOT is_app_user() AND my_patient_id() IS NOT NULL
      AND (NEW.patient_id, NEW.hn, NEW.national_id, NEW.first_name, NEW.last_name, NEW.birth_date, NEW.gender,
           NEW.blood_type, NEW.allergy_note, NEW.created_at, NEW.user_id)

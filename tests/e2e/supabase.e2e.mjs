@@ -155,7 +155,10 @@ for (const [who, table] of [['patient', 'patient'], ['pharmacist', 'staff']]) {
   const mail = `nurse.new${t}@example.test`; sql(`insert into staff(first_name, last_name, role, email) values ('พยาบาล', 'ใหม่', 'nurse', '${mail}')`);
   const st = await fresh().auth.signUp({ email: mail, password: 'secret123', options: { data: { account_type: 'staff' } } });
   const srole = st.data?.user ? (await admin.rpc('role_of', { uid: st.data.user.id })).data : null;
-  check(C, 'สมัครเป็นเจ้าหน้าที่ด้วยอีเมลที่ admin เตรียมไว้', 'ผูกกับ staff role=nurse', st.error?.message ?? `role=${srole}`, srole === 'nurse'); }
+  check(C, 'สมัครเป็นเจ้าหน้าที่ด้วยอีเมลที่ admin เตรียมไว้', 'ผูกกับ staff role=nurse', st.error?.message ?? `role=${srole}`, srole === 'nurse');
+  // leave the seed data as it was (a later check counts patients): remove what these sign-ups created
+  for (const u of [s.data?.user, st.data?.user]) if (u) await admin.auth.admin.deleteUser(u.id);
+  sql(`delete from patient where national_id='${nid}'`); sql(`delete from staff where email='${mail}'`); }
 { const spoof = await U.none.sb.from('chat_logs').insert({ user_id: U.pharmacist.id, question: 'spoof' }).select();
   check(C, 'none: เขียน chat_logs ในชื่อคนอื่น', 'ถูกปฏิเสธ 42501', spoof.error?.code ?? 'เขียนได้!', spoof.error?.code === '42501');
   const rd = await U.pharmacist.sb.from('chat_logs').select('user_id');
@@ -344,7 +347,7 @@ const crud = [
 ];
 for (const [name, fn, code] of crud) { const r = await fn();
   check(C, name, `${code} → "${friendlyError({ code })}"`, `${r.error?.code ?? 'สำเร็จ!'} → "${friendlyError(r.error)}"`, r.error?.code === code); }
-check(C, 'ข้อมูลหลักไม่ถูกแก้หลังทดสอบ', `patient=${PATIENT_COUNT}, ตาราง 22`, `patient=${sql('select count(*) from patient')}, ตาราง ${sql("select count(*) from pg_tables where schemaname='public'")}`,
+check(C, 'ข้อมูลหลักไม่ถูกแก้หลังทดสอบ', `patient=${PATIENT_COUNT}, ตาราง 21`, `patient=${sql('select count(*) from patient')}, ตาราง ${sql("select count(*) from pg_tables where schemaname='public'")}`,
   sql('select count(*) from patient') === PATIENT_COUNT && sql("select count(*) from pg_tables where schemaname='public'") === '22');
 
 // ---------- report ----------
