@@ -10,3 +10,4 @@ docs/AIE313_Mini_Project.pdf
 
 # e2e test dependencies
 node_modules/
+web/tests/screens/
