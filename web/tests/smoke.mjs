@@ -72,6 +72,17 @@ await check('delete patient with dependents shows Thai FK error', async () => {
 await check('add patient with missing required field is blocked', async () => {
   await page.click('#new'); await page.fill('#f_hn', 'HN9'); await page.click('#form button[type=submit]');
   await page.waitForFunction(() => document.querySelector('#err').textContent.includes('กรุณากรอก')); });
+await check('drawer: title, error inside it, Escape closes and focus returns to the add button', async () => {
+  assert.equal(await page.textContent('#form h2'), 'เพิ่มผู้ป่วย');
+  assert.ok((await page.textContent('#form-err')).includes('กรุณากรอก'));
+  await page.keyboard.press('Escape'); await page.waitForSelector('#form', { state: 'hidden' });
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'new'); });
+await check('status select shows Thai labels with database values', async () => {
+  await page.selectOption('#t', 'booking'); await page.click('#new');
+  assert.deepEqual(await page.$$eval('#f_status option', (o) => o.slice(1).map((x) => [x.value, x.textContent])),
+    [['pending', 'รอยืนยัน'], ['confirmed', 'ยืนยันแล้ว'], ['completed', 'เสร็จสิ้น'], ['cancelled', 'ยกเลิก']]);
+  await page.click('#form .drawer-foot button[type=button]'); await page.waitForSelector('#form', { state: 'hidden' });
+  await page.selectOption('#t', 'patient'); await page.waitForSelector('#list table'); });
 await check('duplicate booking shows Thai duplicate error', async () => {
   await page.selectOption('#t', 'booking'); await page.click('#new');
   await page.fill('#f_patient_id', '1'); await page.fill('#f_staff_id', '1'); await page.fill('#f_booking_date', '2026-11-20'); await page.fill('#f_booking_time', '09:00'); await page.fill('#f_queue_no', '1'); await page.selectOption('#f_status', 'pending');
@@ -168,7 +179,8 @@ await check('patient account: own-record tables only, book with a doctor list, n
   assert.equal(await page.locator('#f_queue_no, #f_patient_id, #f_status').count(), 0, 'set by the database');
   await page.selectOption('#f_staff_id', '7'); await page.fill('#f_booking_date', '2099-01-02'); await page.fill('#f_booking_time', '10:30');
   await page.click('#form button[type=submit]'); await page.waitForSelector('#form', { state: 'hidden' });
-  assert.deepEqual(await page.evaluate(() => window.__lastInsert), { staff_id: 7, booking_date: '2099-01-02', booking_time: '10:30', symptom: null }); });
+  assert.deepEqual(await page.evaluate(() => window.__lastInsert), { staff_id: 7, booking_date: '2099-01-02', booking_time: '10:30', symptom: null });
+  await page.waitForSelector('#toasts .toast'); assert.equal(await page.textContent('#toasts .toast'), 'เพิ่มข้อมูลแล้ว'); });
 await check('patient: no reports tab, own-billing dashboard', async () => {
   assert.equal(await page.isVisible('[data-tab=views]'), false);
   assert.deepEqual(await page.$$eval('#nav button', (b) => b.filter((x) => !x.hidden).map((x) => x.dataset.tab)), ['data', 'dash', 'chat']);
