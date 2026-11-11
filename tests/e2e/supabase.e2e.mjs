@@ -348,7 +348,7 @@ const crud = [
 for (const [name, fn, code] of crud) { const r = await fn();
   check(C, name, `${code} → "${friendlyError({ code })}"`, `${r.error?.code ?? 'สำเร็จ!'} → "${friendlyError(r.error)}"`, r.error?.code === code); }
 check(C, 'ข้อมูลหลักไม่ถูกแก้หลังทดสอบ', `patient=${PATIENT_COUNT}, ตาราง 21`, `patient=${sql('select count(*) from patient')}, ตาราง ${sql("select count(*) from pg_tables where schemaname='public'")}`,
-  sql('select count(*) from patient') === PATIENT_COUNT && sql("select count(*) from pg_tables where schemaname='public'") === '22');
+  sql('select count(*) from patient') === PATIENT_COUNT && sql("select count(*) from pg_tables where schemaname='public'") === '21');
 
 // ---------- report ----------
 mock.close();
