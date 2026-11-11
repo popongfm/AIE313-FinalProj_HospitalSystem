@@ -78,7 +78,7 @@ export async function handleMcpChat(deps: AgentDeps, question: string, user: Cha
     const attempts: { tool: string; error?: string }[] = [];   // every tool call, also the refused ones (for chat_logs)
     for (let step = 0; step < MAX_STEPS; step++) {
       let reply: AssistantMsg;
-      try { reply = await deps.llm(messages, tools); }
+      try { reply = await deps.llm(messages, tools); if (!reply || typeof reply !== 'object') throw new Error('LLM returned no message'); }
       catch (e) { const why = String((e as Error)?.message ?? e).slice(0, 300); console.error('[chat-mcp] LLM call failed:', why);
         await log({ error: `llm_unavailable: ${why}` }); return fail('ระบบ AI ไม่พร้อมใช้งานในขณะนี้ กรุณาลองใหม่อีกครั้ง'); }
       if (!reply.tool_calls?.length) {

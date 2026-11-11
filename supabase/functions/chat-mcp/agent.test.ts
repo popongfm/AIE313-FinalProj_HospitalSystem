@@ -166,3 +166,8 @@ test('appointment refused by the database and the model gives up -> the Thai rea
   assert.match(r.error!, /ระบบนัดหมายยังไม่พร้อม/); assert.match(String(logs.at(-1)?.error), /^booking_refused: Not possible: Could not find/);
   assert.equal(logs.at(-1)?.tool_name, 'mcp:propose_booking!');
 });
+
+test('an empty LLM reply is an LLM failure, not a crash', async () => {
+  const r = await handleMcpChat({ llm: async () => undefined as unknown as AssistantMsg, runQuery: async () => [], log: async () => {} }, 'q', U);
+  assert.match(r.error!, /ระบบ AI ไม่พร้อม/);
+});
