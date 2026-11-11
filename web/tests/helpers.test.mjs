@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coerceRow, tableModel, pivot, sumBy, countDistinctBy, statusInfo, isStatusColumn, matchesQuery } from '../js/helpers.js';
+import { coerceRow, tableModel, pivot, sumBy, countDistinctBy, statusInfo, isStatusColumn, matchesQuery, chartTheme } from '../js/helpers.js';
 import { TABLES, PATIENT_TABLES } from '../js/tables.js';
 
 test('coerceRow trims text, converts numbers, nulls blank optionals', () => {
@@ -94,4 +94,11 @@ test('isStatusColumn', () => {
 test('matchesQuery: Thai, digits, case, blank', () => {
   assert.ok(matchesQuery(['HN1', 'อนันต์'], 'อนัน')); assert.ok(matchesQuery(['Warfarin'], ' warf ')); assert.ok(matchesQuery(['1100000000001'], '0001'));
   assert.ok(matchesQuery(['x'], '')); assert.ok(!matchesQuery(['HN1', 'อนันต์'], 'สมชาย'));
+});
+test('chartTheme: Chart.js defaults from the page colours', () => {
+  assert.deepEqual(chartTheme({ ink: '#111', muted: '#555', line: '#ddd', font: 'X' }), {
+    font: { family: 'X', size: 13 }, color: '#555', borderColor: '#ddd',
+    elements: { bar: { borderRadius: 6, borderSkipped: false, maxBarThickness: 44 } },
+    plugins: { legend: { labels: { usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, color: '#111' } }, tooltip: { padding: 10, cornerRadius: 8 } },
+    scale: { grid: { color: '#ddd' }, ticks: { color: '#555' } } });
 });

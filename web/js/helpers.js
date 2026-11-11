@@ -93,3 +93,13 @@ export function matchesQuery(cells, query) {
   const q = norm(query ?? '');
   return q === '' || cells.some((c) => norm(c).includes(q));
 }
+
+// Chart.js defaults that match the page (fonts, text and grid colours, rounded bars). Pure: colours come in as strings.
+export function chartTheme({ ink, muted, line, font }) {
+  return {
+    font: { family: font, size: 13 }, color: muted, borderColor: line,
+    elements: { bar: { borderRadius: 6, borderSkipped: false, maxBarThickness: 44 } },
+    plugins: { legend: { labels: { usePointStyle: true, pointStyle: 'rectRounded', boxWidth: 10, color: ink } }, tooltip: { padding: 10, cornerRadius: 8 } },
+    scale: { grid: { color: line }, ticks: { color: muted } },
+  };
+}

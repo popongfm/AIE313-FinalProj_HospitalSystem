@@ -107,6 +107,7 @@ await check('admin dashboard draws all 5 staff charts in order', async () => {
   await page.evaluate(() => { window.__charts = []; });
   await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 5);
   assert.deepEqual((await headings()).map((h) => h.slice(0, 2)), ['D1', 'D2', 'D3', 'D4', 'D5']);
+  assert.deepEqual(await page.$$eval('#panel .chart-card', (c) => c.map((x) => x.style.getPropertyValue('--zone').trim())), ['var(--z-appt)', 'var(--z-rec)', 'var(--z-rx)', 'var(--z-rec)', 'var(--z-rx)']);
   assert.equal(await page.textContent('#page-desc'), 'กราฟตามหน้าที่ของบัญชีนี้ ผู้ดูแลระบบเห็นทุกกราฟ');
   const c = await page.evaluate(() => window.__charts.map((x) => ({ labels: x.data.labels, data: x.data.datasets.map((d) => d.data) })));
   assert.deepEqual(c[1].data[0], [150]);

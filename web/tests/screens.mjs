@@ -1,5 +1,5 @@
 // Screenshots of every page for visual review: desktop and mobile, light and dark.
-// Run: PLAYWRIGHT_PATH=<playwright> node web/tests/screens.mjs   → web/tests/screens/<page>-<width>-<scheme>.png
+// Run: PLAYWRIGHT_PATH=<playwright> [CHARTJS_PATH=<chart.umd.js>] node web/tests/screens.mjs   → web/tests/screens/<page>-<width>-<scheme>.png
 import { mkdir } from 'node:fs/promises';
 import { loadPlaywright, startServer, newMockedContext } from './harness.mjs';
 
@@ -23,6 +23,8 @@ for (const size of SIZES) {
   for (const colorScheme of ['light', 'dark']) {
     const { isMobile, ...viewport } = size;
     const ctx = await newMockedContext(browser, { viewport, isMobile: !!isMobile, colorScheme, deviceScaleFactor: 1 });
+    // CHARTJS_PATH=<chart.umd.js>: draw real charts instead of the test stub
+    if (process.env.CHARTJS_PATH) await ctx.route('**/cdnjs.cloudflare.com/**', (r) => r.fulfill({ contentType: 'text/javascript', path: process.env.CHARTJS_PATH }));
     const page = await ctx.newPage();
     const shot = async (name) => {
       await page.waitForTimeout(350);   // fonts, drawer transition
