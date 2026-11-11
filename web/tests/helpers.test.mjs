@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coerceRow, tableModel, pivot, sumBy, countDistinctBy } from '../js/helpers.js';
+import { coerceRow, tableModel, pivot, sumBy, countDistinctBy, statusInfo, isStatusColumn, matchesQuery } from '../js/helpers.js';
 import { TABLES, PATIENT_TABLES } from '../js/tables.js';
 
 test('coerceRow trims text, converts numbers, nulls blank optionals', () => {
@@ -75,4 +75,23 @@ test('datetime-local: shown as Thai wall-clock time, saved with +07:00', () => {
 });
 test('tableModel shows timestamptz cells in Thai time', () => {
   assert.deepEqual(tableModel([{ created_at: '2026-11-10T03:00:00+00:00', booking_date: '2026-11-10' }]).rows, [['2026-11-10 10:00', '2026-11-10']]);
+});
+
+test('statusInfo: known values any case, unknown neutral, empty null', () => {
+  assert.deepEqual(statusInfo('pending'), { tone: 'warn', label: 'รอยืนยัน' });
+  assert.deepEqual(statusInfo('Pending'), { tone: 'warn', label: 'รอคัดกรอง' });
+  assert.deepEqual(statusInfo('Dispensed'), { tone: 'ok', label: 'จ่ายยาแล้ว' });
+  assert.deepEqual(statusInfo('CONFIRMED'), { tone: 'info', label: 'ยืนยันแล้ว' });
+  assert.deepEqual(statusInfo('REORDER_URGENT'), { tone: 'danger', label: 'ต้องสั่งด่วน' });
+  assert.deepEqual(statusInfo('Admitted'), { tone: 'neutral', label: 'Admitted' });
+  assert.equal(statusInfo(null), null); assert.equal(statusInfo(''), null);
+  assert.equal(statusInfo('constructor').tone, 'neutral');   // own keys only
+});
+test('isStatusColumn', () => {
+  for (const c of ['status', 'stock_status', 'prescription_status']) assert.ok(isStatusColumn(c));
+  assert.ok(!isStatusColumn('statusbar'));
+});
+test('matchesQuery: Thai, digits, case, blank', () => {
+  assert.ok(matchesQuery(['HN1', 'อนันต์'], 'อนัน')); assert.ok(matchesQuery(['Warfarin'], ' warf ')); assert.ok(matchesQuery(['1100000000001'], '0001'));
+  assert.ok(matchesQuery(['x'], '')); assert.ok(!matchesQuery(['HN1', 'อนันต์'], 'สมชาย'));
 });

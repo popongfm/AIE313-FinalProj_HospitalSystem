@@ -66,3 +66,30 @@ export function countDistinctBy(rows, groupKey, idKey) {
   }
   return [...groups].map(([key, ids]) => ({ key, count: ids.size }));
 }
+
+// ---------- status values shown as coloured badges (table cells, form options) ----------
+// Exact values first (prescriptions use capitalised values, bookings lower-case), then lower-case.
+const STATUS_EXACT = {
+  Pending: ['warn', 'รอคัดกรอง'], Screened: ['info', 'คัดกรองแล้ว'], Dispensed: ['ok', 'จ่ายยาแล้ว'], Cancelled: ['neutral', 'ยกเลิก'],
+};
+const STATUS_LOWER = {
+  pending: ['warn', 'รอยืนยัน'], confirmed: ['info', 'ยืนยันแล้ว'], completed: ['ok', 'เสร็จสิ้น'], cancelled: ['neutral', 'ยกเลิก'],
+  screened: ['info', 'คัดกรองแล้ว'], dispensed: ['ok', 'จ่ายยาแล้ว'],
+  normal: ['ok', 'ปกติ'], near_expiry: ['warn', 'ใกล้หมดอายุ'], reorder_urgent: ['danger', 'ต้องสั่งด่วน'],
+  available: ['ok', 'ว่าง'], occupied: ['info', 'มีผู้ป่วย'], maintenance: ['neutral', 'ปิดซ่อม'],
+};
+// { tone, label } for a status value; unknown values keep their own text in a neutral tone; empty -> null
+export function statusInfo(value) {
+  if (value == null || value === '') return null;
+  const v = String(value);
+  const hit = (Object.hasOwn(STATUS_EXACT, v) && STATUS_EXACT[v]) || (Object.hasOwn(STATUS_LOWER, v.toLowerCase()) && STATUS_LOWER[v.toLowerCase()]);
+  return hit ? { tone: hit[0], label: hit[1] } : { tone: 'neutral', label: v };
+}
+export function isStatusColumn(name) { return name === 'status' || String(name).endsWith('_status'); }
+
+// table search: does any cell contain the query (case-insensitive, Unicode-normalised)?
+const norm = (s) => String(s).normalize('NFC').toLowerCase().trim();
+export function matchesQuery(cells, query) {
+  const q = norm(query ?? '');
+  return q === '' || cells.some((c) => norm(c).includes(q));
+}
