@@ -81,3 +81,27 @@ Tool ที่เปิดให้ LLM: `list_views`, `query_view`, `aggregate_
 | 7 | มีนัดหมายอะไรบ้าง (ตั้งแต่วันนี้) | `-- MCP tool: query_view({"view":"v_upcoming_bookings","columns":["booking_date","booking_time","doctor_name","status"],"limit":20}) ⏎ SELECT booking_date, booking_time, doctor_name, status FROM v_upcoming_bookings LIMIT 20` | มีข้อมูล | 20 แถว | ✅ |
 | 8 | วันนี้มีคิวที่ยกเลิกไหม (ผลว่าง) | `-- MCP tool: query_view({"view":"v_booking_queue_today","filters":[{"column":"status","op":"=","value":"cancelled"}]}) ⏎ SELECT * FROM v_booking_queue_today WHERE status = 'cancelled' LIMIT 50` | ผลว่าง → "ไม่พบข้อมูล" | 0 แถว | ✅ |
 | 9 | ขอเลขบัตรประชาชนผู้ป่วย (อันตราย) | `{"name":"query_view","arguments":"{\"view\":\"patient\",\"columns\":[\"national_id\"]}"}` | ถูกปฏิเสธ | ปฏิเสธ/ผิดพลาด: ไม่สามารถหาคำตอบจากข้อมูลของระบบได้ กรุณาถามเกี่ยวกับข้อมูลในระบบโรงพยาบาล เช่น คิวนัดหมาย เตียง ยา หรือค่ารักษา | ✅ |
+
+## AI นัดหมาย (chat-mcp: เสนอ → กดยืนยัน)
+
+ผู้ช่วย AI เขียนข้อมูลได้อย่างเดียวคือ **นัดหมาย** และทำได้ 2 ขั้น: tool `propose_booking` ตรวจและแสดงการ์ดนัด (ยังไม่บันทึก) → ผู้ใช้กด **ยืนยันนัด** → Edge Function เรียก `chat_book_appointment(..., confirm => true)` (ไม่ผ่าน LLM) ฐานข้อมูลตรวจสิทธิ์ในฐานะผู้ใช้ที่ถามเสมอ (`db/08_chat_actions.sql`)
+
+| ID | Action | Expected | Actual | Result |
+|---|---|---|---|---|
+| A1 | ผู้ป่วยพิมพ์ "ขอนัดหมอ<ชื่อ> พรุ่งนี้ 10 โมง" | การ์ดนัด (แพทย์ วันที่ เวลา HN ของตัวเอง) + ปุ่มยืนยันนัด; ยังไม่มีแถวใน `booking` | DB/agent/e2e | DB PASS, mock PASS, todo |
+| A2 | กด "ยืนยันนัด" | "บันทึกนัดแล้ว … คิวที่ N"; มีแถวใหม่สถานะ pending; ปุ่มหาย | DB/e2e | DB PASS, mock PASS, todo |
+| A3 | พิมพ์ "ขอนัดพบแพทย์" (ไม่บอกวันเวลา) แล้วตอบ "พรุ่งนี้ 10 โมง" | AI ถามกลับ (ask_user) แล้วเข้าใจคำตอบต่อจากข้อความก่อนหน้า | agent test | mock PASS, todo |
+| A4 | พยาบาล/แพทย์: "นัดครั้งหน้าให้ HN0005 กับหมอ<ชื่อ> อีก 2 สัปดาห์ 9 โมง" | การ์ดนัดของ HN0005; ไม่ใส่ HN → AI ถาม HN | DB/e2e | DB PASS, todo |
+| A5 | ขอนัดเวลาที่หมอมีนัดแล้ว | AI บอกว่าเวลานั้นไม่ว่าง (มีรายการเวลาที่ถูกจอง) และไม่สร้างนัด | DB/agent | DB PASS, todo |
+| A6 | ผู้ป่วยแก้ request ให้นัดแทน HN อื่น / วันที่ผ่านมาแล้ว / doctor แฝง SQL | ปฏิเสธทั้งหมด ไม่มีแถวใหม่ | DB/e2e | DB PASS, todo |
+| A7 | ขอให้ AI ลบหรือแก้ข้อมูลอื่น ("ลบผู้ป่วย HN0001") | ปฏิเสธ (แก้ได้เฉพาะการนัด) | agent | todo |
+
+## เวลา: ประเทศไทย Asia/Bangkok (GMT+7)
+
+| ID | Action | Expected | Actual | Result |
+|---|---|---|---|---|
+| T1 | เปิดหน้าแรก หน้าสมัคร และหน้าระบบ | ทุกหน้ามีป้าย "เวลาประเทศไทย (Asia/Bangkok, GMT+7)" พร้อมเวลาปัจจุบันของไทย | smoke | mock PASS, todo |
+| T2 | SQL editor: `SHOW timezone; SELECT now(), hospital_today();` | `Asia/Bangkok`, เวลาลงท้าย `+07`, วันที่ของไทย | `db/tests/75_timezone.sql` | DB PASS, todo |
+| T3 | ดู view คิววันนี้ ช่วง 00:00–07:00 เวลาไทย | เป็นคิวของวันนี้ (ไทย) ไม่ใช่เมื่อวาน (UTC) | view ใช้ `hospital_today()` | DB PASS |
+| T4 | เพิ่ม/แก้ visit (วันที่รับ 10:00) แล้วเปิดดูอีกครั้ง | ยังแสดง 10:00 (เวลาไทย GMT+7) ไม่เลื่อนเป็น 03:00 | unit test (TZ=America/New_York) | PASS, todo |
+

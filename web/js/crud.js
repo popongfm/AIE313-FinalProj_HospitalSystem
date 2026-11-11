@@ -1,6 +1,6 @@
 import { supabase } from './supabaseClient.js';
 import { friendlyError } from './errors.js';
-import { coerceRow } from './helpers.js';
+import { coerceRow, bangkokDate, toDatetimeLocal } from './helpers.js';
 import { TABLES, PATIENT_TABLES } from './tables.js';
 import { renderTable } from './table.js';
 
@@ -30,15 +30,16 @@ export async function mountCrudPage(el, access = {}) {
   }
   function field(c, value) {
     const wrap = document.createElement('div');
-    const label = document.createElement('label'); label.textContent = c.label + (c.required ? ' *' : ''); label.htmlFor = 'f_' + c.name;
+    const label = document.createElement('label'); label.htmlFor = 'f_' + c.name;
+    label.textContent = c.label + (c.type === 'time' || c.type === 'datetime-local' ? ' (เวลาไทย GMT+7)' : '') + (c.required ? ' *' : '');
     let input;
     if (c.type === 'select') {
       input = document.createElement('select'); input.add(new Option('', ''));
       (c.source ? options[c.source] : c.options).forEach((o) => input.add(typeof o === 'string' ? new Option(o, o) : new Option(o.label, o.value)));
     } else { input = document.createElement('input'); input.type = c.type === 'number' ? 'number' : c.type; if (c.type === 'number') input.step = 'any'; }
-    if (c.minToday) input.min = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    if (c.minToday) input.min = bangkokDate();   // today in Thailand, not in the browser's time zone
     input.id = 'f_' + c.name; input.name = c.name;
-    if (value != null) input.value = c.type === 'datetime-local' ? String(value).slice(0, 16) : value;
+    if (value != null) input.value = c.type === 'datetime-local' ? toDatetimeLocal(value) : value;
     wrap.append(label, input); return wrap;
   }
   async function openForm(row) {

@@ -12,6 +12,7 @@
   <div class="utility">
     <div class="wrap">
       <span>ข้อมูลผู้ป่วยและบุคลากรในระบบนี้เป็นข้อมูลจำลองเพื่อการเรียนการสอน</span>
+      <span id="tz-clock"></span>
       <a href="https://github.com/popongfm/AIE313-FinalProj_HospitalSystem">ดูโค้ดบน GitHub</a>
     </div>
   </div>
@@ -72,6 +73,8 @@
   </footer>
 
   <script type="module">
+    import { mountClock } from './js/clock.js';
+    mountClock(document.getElementById('tz-clock'));
     import { signUp } from './js/auth.js';
     import { registrationProblem } from './js/authMessages.js';
     const $ = (id) => document.getElementById(id);

@@ -328,6 +328,40 @@ for (const fn of ['chat', 'chat-mcp']) {
   const after = Number(sql('select count(*) from chat_logs')); check(C, 'chat_logs บันทึกทุกคำถาม', 'เพิ่ม 1 แถว', `${before} → ${after}`, after === before + 1); }
 
 // ================= F. CRUD constraints → friendly Thai errors =================
+C = 'G chat-mcp: นัดหมายผ่าน AI (เสนอ → ยืนยัน)';
+{ const day = sql('select (hospital_today() + 40)::text'), doc = String(STAFF.doctor);
+  const nAt = (time) => sql(`select count(*) from booking where staff_id = ${doc} and booking_date = '${day}' and booking_time = '${time}'`);
+  const propose = async (who, args) => { setScript({ tool_calls: [{ name: 'propose_booking', args }] }); const r = await ask('chat-mcp', 'ขอนัดครั้งหน้า', who); r.tool = lastToolResults.join(' | '); return r; };
+  const confirm = (who, args) => ask('chat-mcp', '', who, JSON.stringify({ confirm_booking: args }));
+
+  const p = await propose('patient', { doctor: doc, date: day, time: '09:40', symptom: 'ติดตามอาการ' });
+  check(C, 'ผู้ป่วยขอนัด (propose_booking)', 'ได้ action รอยืนยัน ยังไม่บันทึก', `${show(p)} action=${JSON.stringify(p.action?.args)} บันทึก=${nAt('09:40')}`,
+    !p.error && p.action?.type === 'book_appointment' && nAt('09:40') === '0');
+  const c = await confirm('patient', p.action?.args);
+  const mine = sql(`select count(*) from booking where staff_id = ${doc} and booking_date = '${day}' and booking_time = '09:40' and patient_id = ${PID} and status = 'pending'`);
+  check(C, 'ผู้ป่วยกดยืนยันนัด', 'บันทึก 1 แถวเป็นของตัวเอง สถานะ pending', `${show(c)} ${c.answer?.slice(0, 30) ?? ''} แถว=${mine}`, !c.error && mine === '1');
+  const again = await confirm('patient', p.action?.args);
+  check(C, 'กดยืนยันซ้ำ (เวลาเดิม)', 'ปฏิเสธ ไม่บันทึกซ้ำ', show(again), !!again.error && nAt('09:40') === '1');
+
+  const other = sql(`select hn from patient where patient_id <> ${PID} order by patient_id limit 1`);
+  const forged = await confirm('patient', { doctor: doc, date: day, time: '09:50', hn: other });
+  check(C, 'ผู้ป่วยแก้ request ให้นัดแทนคนอื่น', 'ปฏิเสธ', show(forged), !!forged.error && nAt('09:50') === '0');
+
+  const noHn = await propose('nurse', { doctor: doc, date: day, time: '10:10' });
+  check(C, 'พยาบาลขอนัดโดยไม่ระบุ HN', 'ไม่ได้ action (DB ขอ HN)', `${show(noHn)} | tool: ${noHn.tool.slice(0, 60)}`, !noHn.action && /HN/.test(noHn.tool));
+  const withHn = await propose('nurse', { doctor: doc, date: day, time: '10:10', hn: other });
+  const saved = await confirm('nurse', withHn.action?.args);
+  const forOther = sql(`select count(*) from booking b join patient p using (patient_id) where b.staff_id = ${doc} and b.booking_date = '${day}' and b.booking_time = '10:10' and p.hn = '${other}'`);
+  check(C, 'พยาบาลนัดครั้งหน้าให้ผู้ป่วยตาม HN', 'บันทึกให้ HN นั้น', `${show(saved)} แถว=${forOther}`, !saved.error && forOther === '1');
+
+  const past = await confirm('patient', { doctor: doc, date: '2020-01-01', time: '09:00' });
+  check(C, 'ยืนยันนัดวันที่ผ่านมาแล้ว', 'ปฏิเสธ', show(past), !!past.error && /ผ่านมาแล้ว/.test(past.error));
+  const inj = await confirm('patient', { doctor: "1'; delete from booking; --", date: day, time: '09:00' });
+  check(C, 'doctor แฝง SQL ใน confirm', 'ปฏิเสธ ข้อมูลไม่หาย', show(inj), !!inj.error && Number(sql('select count(*) from booking')) > 0);
+  const none = await confirm('none', { doctor: doc, date: day, time: '11:00' });
+  check(C, 'บัญชีที่ยังไม่ผูกกดยืนยันนัด', 'HTTP 403', show(none), none.status === 403 && nAt('11:00') === '0');
+  sql(`delete from booking where booking_date = '${day}'`); }
+
 C = 'F CRUD และข้อความ error บนเว็บ';
 const sb = U.pharmacist.sb;
 const bk = (await sb.from('booking').select('*').order('booking_id').limit(1)).data[0];

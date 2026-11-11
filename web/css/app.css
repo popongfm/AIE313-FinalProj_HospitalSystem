@@ -282,3 +282,19 @@ pre { overflow-x: auto; background: var(--mist); border: 1px solid var(--line); 
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 14px; }
 .grid2 .full { grid-column: 1 / -1; }
 @media (max-width: 560px) { .reg-card { padding: 22px; } .grid2, .account-type { grid-template-columns: 1fr; } }
+
+/* chat: appointment proposed by the AI assistant, saved only after "ยืนยันนัด" */
+.booking-card { margin-top: 10px; padding: 12px 14px; border: 1px solid var(--scrub); border-radius: 10px; background: var(--scrub-soft); }
+.booking-card .booking-title { font-weight: 600; margin-bottom: 6px; }
+.booking-card > div { margin: 2px 0; }
+.booking-card .row { margin-top: 10px; }
+
+/* time zone of the whole system (js/clock.js): Thailand, Asia/Bangkok (GMT+7) */
+.tz-badge { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.tz-badge b { font-weight: 600; }
+.app-bar .tz-badge { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; color: var(--on-deep); }
+.app-bar .tz-badge b { font-size: 15px; }
+.app-bar .tz-badge small { font-size: 11px; color: var(--on-deep-muted); }
+.utility .tz-badge { color: var(--on-deep); font-size: 14px; }
+.utility .tz-badge small { font-size: inherit; margin-left: 6px; }
+@media (max-width: 720px) { .app-bar .tz-badge { align-items: flex-start; } }

@@ -1,6 +1,6 @@
 # ระบบสารสนเทศโรงพยาบาล AIE313 + AI Chat
 
-Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS แบบ static (Docker image บน Render) · AI Chat (MCP เป็นค่าเริ่มต้น, Text-to-SQL เป็นตัวสำรอง) ที่อ่านได้เฉพาะ 10 views แบบอ่านอย่างเดียว
+Supabase (PostgreSQL + Auth + Edge Function) · เว็บแอป HTML/JS แบบ static (Docker image บน Render) · AI Chat (MCP เป็นค่าเริ่มต้น, Text-to-SQL เป็นตัวสำรอง) ที่อ่านได้เฉพาะ 10 views แบบอ่านอย่างเดียว และ**ทำนัดหมาย**ได้อย่างเดียว (AI เสนอนัด → ผู้ใช้กดยืนยัน)
 งานที่เหลือของแต่ละคน: `docs/TEAM_HANDOFF.md` · แผนงาน: `docs/superpowers/plans/` · ER diagram: `docs/er/` · กรณีทดสอบ: `docs/test-cases.md` · query วิเคราะห์: `analysis/analysis_queries.sql`
 
 ## ขั้นตอน deploy
@@ -20,7 +20,8 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
    ```
 2. SQL editor: `ALTER ROLE service_role SET statement_timeout = '10s';` (จำกัดเวลา query ของ chat)
-   **อัปเดตโปรเจกต์ที่ลง schema ไปแล้ว:** รันไฟล์ใน `db/migrations/` ที่ยังไม่เคยรันตามลำดับวันที่ (แต่ละไฟล์เป็น transaction เดียว) **ก่อน** deploy Edge Function เวอร์ชันเดียวกัน เช่น `2026-11-10_patient_portal.sql` (สิทธิ์บัญชีผู้ป่วย) แล้วตามด้วย `2026-11-10b_upcoming_bookings.sql` (view นัดหมายตั้งแต่วันนี้) และ `2026-11-11_user_link_trigger.sql` (เลิกใช้ `profiles` ย้ายการผูกบัญชีเดิมไป `staff.user_id` / `patient.user_id` และเพิ่ม trigger สมัครสมาชิก) โปรเจกต์ใหม่ใช้แค่ `schema.sql` + `seed.sql`
+   **เวลา:** ทั้งระบบใช้ **เวลาประเทศไทย Asia/Bangkok (GMT+7)** — `schema.sql` ตั้ง time zone ของฐานข้อมูล (`ALTER DATABASE … SET timezone TO 'Asia/Bangkok'`), view และการตรวจวันนัดใช้ `hospital_today()` (วันที่ของไทย ไม่ใช่ UTC), chat รัน SQL ในเวลาไทย, หน้าเว็บแสดงเวลา `timestamptz` เป็นเวลาไทยและบันทึกพร้อม `+07:00` และทุกหน้ามีป้าย "เวลาประเทศไทย (Asia/Bangkok, GMT+7)" เช็กได้ด้วย `SHOW timezone;` (ต้องได้ `Asia/Bangkok`)
+   **อัปเดตโปรเจกต์ที่ลง schema ไปแล้ว:** รันไฟล์ใน `db/migrations/` ที่ยังไม่เคยรันตามลำดับวันที่ (แต่ละไฟล์เป็น transaction เดียว) **ก่อน** deploy Edge Function เวอร์ชันเดียวกัน เช่น `2026-11-10_patient_portal.sql` (สิทธิ์บัญชีผู้ป่วย) แล้วตามด้วย `2026-11-10b_upcoming_bookings.sql` (view นัดหมายตั้งแต่วันนี้) `2026-11-11_user_link_trigger.sql` (เลิกใช้ `profiles` ย้ายการผูกบัญชีเดิมไป `staff.user_id` / `patient.user_id` และเพิ่ม trigger สมัครสมาชิก) `2026-11-12_chat_booking.sql` (AI ทำนัดหมาย) และ `2026-11-12b_thai_timezone.sql` (เวลาประเทศไทย GMT+7; หลังรันให้ Restart project ใน Project Settings → General เพื่อให้ connection ใหม่ใช้เวลาไทย) โปรเจกต์ใหม่ใช้แค่ `schema.sql` + `seed.sql`
 3. **Auth** (หน้าเว็บมีปุ่มสมัครสมาชิกตามที่โจทย์กำหนด):
    - Authentication → Sign In / Providers: **เปิด "Allow new users to sign up"** ไว้
    - **"Confirm email"**: สำหรับ demo ให้ปิดไว้ เพราะ SMTP เริ่มต้นของ Supabase ส่งอีเมลยืนยันได้เฉพาะอีเมลของสมาชิกในโปรเจกต์ ถ้าจะเปิดไว้ต้องตั้ง SMTP เอง
@@ -41,6 +42,7 @@ Image ไม่มี key อยู่ข้างใน เพราะ `config
 4. **Edge Functions** (ต้องมี Supabase CLI: `brew install supabase/tap/supabase` แล้ว `supabase login`) รันในโฟลเดอร์ repo
    chat หลักคือ **MCP (วิธี C)** `chat-mcp` ส่วน `chat` (Text-to-SQL, วิธี B) เป็นตัวสำรอง:
    `supabase functions deploy chat-mcp --project-ref <ref>` (และ `chat` ถ้าต้องการ)
+   **AI ทำนัด (เฉพาะ `chat-mcp`):** tool `propose_booking` ตรวจนัดผ่าน `chat_book_appointment(..., confirm => false)` แล้วแสดงการ์ดในแชท ยังไม่บันทึก จนกว่าผู้ใช้กด **ยืนยันนัด** (หน้าเว็บส่ง `{ confirm_booking }` กลับมา บันทึกโดยไม่ผ่าน LLM) ฟังก์ชันใน `db/08_chat_actions.sql` ทำงานในฐานะผู้ใช้ที่ถาม: ผู้ป่วยนัดได้เฉพาะของตัวเอง เจ้าหน้าที่ต้องระบุ HN บัญชีที่ยังไม่ผูกทำไม่ได้ LLM ไม่ได้เขียน SQL เอง และยังแก้/ลบข้อมูลอื่นไม่ได้ ส่วน `chat` (Text-to-SQL) ยังอ่านอย่างเดียว
    `supabase secrets set GROQ_API_KEY=<key> LLM_MODEL=openai/gpt-oss-120b --project-ref <ref>`
    (`<ref>` คือรหัสโปรเจกต์ใน URL ของ Dashboard; Supabase ใส่ `SUPABASE_URL` และ `SUPABASE_SERVICE_ROLE_KEY` ให้ function อัตโนมัติ) ตรวจชื่อโมเดลว่ายังใช้ได้ที่ https://console.groq.com/docs/models (Groq ปิด `llama-3.3-70b-versatile` ไปเมื่อ 16 ส.ค. 2026; ถ้าไม่ตั้ง `LLM_MODEL` function จะใช้ `openai/gpt-oss-120b`)
    Supabase CLI รุ่นใหม่ใช้ `--remote=<ref>` แทน `--project-ref <ref>` และใส่ `--use-api --yes` ได้ถ้าไม่มี Docker หรือหน้าถามกดเลือกไม่ได้
