@@ -16,3 +16,10 @@ export function tabsFor(access = {}) {
 export function chartsFor(role) {
   return [...(typeof role === 'string' && Object.hasOwn(ROLE_CHARTS, role) ? ROLE_CHARTS[role] : STAFF_CHARTS)];
 }
+// the label in the app bar: who this account is in the hospital
+const ROLE_LABELS = { admin: 'ผู้ดูแลระบบ', doctor: 'แพทย์', nurse: 'พยาบาล', pharmacist: 'เภสัชกร', patient: 'ผู้ป่วย' };
+export function roleLabel(access = {}) {
+  if (!access.linked) return 'รอผูกบัญชี';
+  if (access.patient) return ROLE_LABELS.patient;
+  return (typeof access.role === 'string' && Object.hasOwn(ROLE_LABELS, access.role)) ? ROLE_LABELS[access.role] : 'เจ้าหน้าที่';
+}

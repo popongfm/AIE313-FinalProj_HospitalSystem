@@ -1,8 +1,13 @@
 import { requireSession, signOut, getAccess } from './auth.js';
-import { tabsFor } from './roleUi.js';
+import { tabsFor, roleLabel } from './roleUi.js';
+import { icon } from './icons.js';
 import { mountClock } from './clock.js';
 
 mountClock(document.getElementById('tz-clock'));   // the app's time zone: Thailand, Asia/Bangkok (GMT+7)
+// --appbar-h = the app bar's height, so the edit drawer opens below it and the tabs stay usable
+const bar = document.querySelector('.app-bar');
+const syncBar = () => document.documentElement.style.setProperty('--appbar-h', bar.offsetHeight + 'px');
+syncBar(); if (window.ResizeObserver) new ResizeObserver(syncBar).observe(bar);
 const mounts = {
   data:  async (el, access) => (await import('./crud.js')).mountCrudPage(el, access),
   views: async (el) => (await import('./views.js')).mountViewsPage(el),
@@ -37,6 +42,8 @@ if (!access.linked) {
   panel.before(note);
 }
 // tabs this account may open (patients: no reports); the others are hidden and ignored, also when asked for by #hash
+const chip = document.getElementById('role-chip');
+chip.replaceChildren(icon('user'), document.createTextNode(roleLabel(access))); chip.hidden = false;
 const tabs = tabsFor(access);
 document.querySelectorAll('#nav button').forEach((b) => { b.hidden = !tabs.includes(b.dataset.tab); });
 async function show(tab) {
@@ -51,7 +58,7 @@ async function show(tab) {
   try { await mounts[tab](host, access); } catch (e) { host.innerHTML = '<div class="card err">โหลดหน้านี้ไม่สำเร็จ</div>'; console.error(e); }
 }
 document.getElementById('nav').addEventListener('click', (e) => {
-  const tab = e.target.dataset.tab;
+  const tab = e.target.closest('[data-tab]')?.dataset.tab;   // the click may land on the icon inside the button
   if (!tab || !tabs.includes(tab)) return;   // a hidden tab: leave the URL and the page as they are
   history.replaceState(null, '', '#' + tab);   // a reload keeps the current tab
   show(tab);

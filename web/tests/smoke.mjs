@@ -1,71 +1,12 @@
 // Browser smoke test with a mocked Supabase client + stubbed Chart.js.  Run: node web/tests/smoke.mjs
-import { createRequire } from 'node:module';
-const { chromium } = createRequire(import.meta.url)(process.env.PLAYWRIGHT_PATH || 'playwright');
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { extname, join } from 'node:path';
 import assert from 'node:assert/strict';
+import { loadPlaywright, startServer, newMockedContext } from './harness.mjs';
 
-const ROOT = new URL('..', import.meta.url).pathname;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
-const server = createServer(async (req, res) => {
-  try { const p = join(ROOT, req.url.split('?')[0] === '/' ? 'index.html' : req.url.split('?')[0]); res.writeHead(200, { 'content-type': (MIME[extname(p)] || 'text/plain') + '; charset=utf-8' }); res.end(await readFile(p)); }
-  catch { res.writeHead(404); res.end('nf'); }
-}).listen(0);
-const base = `http://127.0.0.1:${server.address().port}`;
-
-const MOCK_SUPABASE = `
-const DB = { patient: [{ patient_id: 1, hn: 'HN1', national_id: '1100000000001', first_name: 'อนันต์', last_name: 'ใจดี' }],
-  v_top_diagnosis: [{ icd_code: 'I10', description: 'ความดันโลหิตสูง', case_count: 9, rank_no: 1 }], v_feedback_summary: [],
-  v_doctor_workload: [{ doctor_name: 'ก', status: 'pending', booking_count: 2 }, { doctor_name: 'ก', status: 'completed', booking_count: 1 }],
-  v_visit_billing: [{ department: 'อายุรกรรม', month: '2026-10', total_amount: 100 }, { department: 'อายุรกรรม', month: '2026-10', total_amount: 50 }],
-  v_inventory_stock_status: [{ generic_name: 'Warfarin', lot_number: 'L1', quantity_on_hand: 20, reorder_point: 100, stock_status: 'REORDER_URGENT' }], booking: [],
-  v_bed_occupancy: [{ department: 'อายุรกรรม', occupied_beds: 3, available_beds: 1 }, { department: 'อายุรกรรม', occupied_beds: 1, available_beds: 1 }, { department: null, occupied_beds: 0, available_beds: 2 }],
-  v_pharmacist_screening_queue: [{ prescription_id: 1, prescription_status: 'Pending' }, { prescription_id: 1, prescription_status: 'Pending' }, { prescription_id: 2, prescription_status: 'Screened' }],
-  visit: [{ visit_id: 5, patient_id: 1, visit_type: 'OPD' }] };
-const sess = () => JSON.parse(localStorage.getItem('mock_session') || 'null');
-// my_role(): what staff.user_id / patient.user_id say about the signed-in account (u-new: not linked yet)
-const ROLES = { 'u-admin': 'admin', 'u-patient': 'patient', 'u-pharm': 'pharmacist', 'u-nurse': 'nurse' };
-export function createClient() {
-  const qb = (table) => { const st = { op: 'select', filters: [] };
-    const b = { select() { return b; }, maybeSingle() { st.single = true; return b; }, order() { return b; }, limit() { return b; }, eq(k, v) { st.filters.push([k, v]); return b; },
-      insert(row) { st.op = 'insert'; st.row = row; window.__lastInsert = row; return b; }, update() { st.op = 'update'; return b; }, delete() { st.op = 'delete'; return b; },
-      then(res) { if (window.__failView === table) return res({ data: null, error: { code: '42P01', message: 'relation does not exist' } });
-        if (st.op === 'insert' && table === 'booking' && st.row.queue_no != null) return res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } });
-        if (st.op === 'delete' && table === 'patient') return res({ data: null, error: { code: '23503', message: 'violates foreign key' } });
-        if (st.op === 'insert') { DB[table] = [...(DB[table] || []), st.row]; return res({ data: null, error: null }); }
-        let rows = DB[table] || []; st.filters.forEach(([k, v]) => { rows = rows.filter((r) => r[k] === v); }); res({ data: st.single ? (rows[0] || null) : rows, error: null }); } };
-    return b; };
-  const BOOK = { hn: 'HN0001', patient_name: 'อนันต์ ใจดี', staff_id: 7, doctor_name: 'แพทย์ ทดสอบ', department: 'อายุรกรรม', booking_date: '2026-11-20', booking_time: '10:00', queue_no: 3 };
-  const invoke = async (name, { body }) => { await new Promise((r) => setTimeout(r, 300)); (window.__chatBodies = window.__chatBodies || []).push(body);
-    if (body.confirm_booking) return { data: { answer: 'บันทึกนัดแล้ว: แพทย์ ทดสอบ วันที่ 2026-11-20 เวลา 10:00 น. คิวที่ 3 (HN HN0001)', sql: '-- chat_book_appointment', columns: Object.keys(BOOK), rows: [{ ...BOOK, booking_id: 9 }], error: null }, error: null };
-    if (body.question.includes('ขอนัด')) return { data: { answer: 'นัดวันไหนครับ', sql: '', columns: [], rows: [], error: null }, error: null };
-    if (body.question.includes('พรุ่งนี้')) return { data: { answer: 'ตรวจสอบรายละเอียดแล้วกดยืนยันนัด', sql: '-- propose_booking', columns: Object.keys(BOOK), rows: [BOOK], error: null,
-      action: { type: 'book_appointment', args: { doctor: '7', date: '2026-11-20', time: '10:00' } } }, error: null };
-    if (body.question.includes('ลบ')) return { data: { answer: '', sql: 'DELETE FROM patient', columns: [], rows: [], error: 'อนุญาตเฉพาะคำสั่ง SELECT เท่านั้น' }, error: null };
-    if (body.question.includes('ว่าง')) return { data: { answer: 'ไม่พบข้อมูลที่ตรงกับคำถาม', sql: 'select 1', columns: [], rows: [], error: null }, error: null };
-    return { data: { answer: 'มีแพทย์ 8 คน', sql: 'select count(*) as n from v_doctor_workload LIMIT 100', columns: ['n'], rows: [{ n: 8 }], error: null }, error: null }; };
-  const rpc = async (name) => {
-    if (name === 'my_role') { const s = sess(); return { data: (s && ROLES[s.user.id]) || null, error: null }; }
-    return { data: name === 'doctor_directory' ? [{ staff_id: 7, doctor_name: 'แพทย์ ทดสอบ', department: 'อายุรกรรม' }] : null, error: null }; };
-  return { from: qb, rpc, functions: { invoke }, auth: {
-    async signInWithPassword({ email, password }) { if (password !== 'secret1') return { error: { message: 'Invalid login credentials' } };
-      localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'new@b.th' ? 'u-new' : email === 'pt@b.th' ? 'u-patient' : email === 'ph@b.th' ? 'u-pharm' : email === 'ns@b.th' ? 'u-nurse' : 'u-admin' } })); return { error: null }; },
-    async signUp({ email, options }) { window.__signups = (window.__signups || 0) + 1; window.__signupData = options && options.data;
-      if (email === 'a@b.th') return { data: { user: { identities: [] }, session: null }, error: null };   // existing e-mail, confirm-email on
-      if (email === 'dup@b.th') return { data: null, error: { message: 'Database error saving new user' } };   // trigger refused the patient data
-      // confirm-email off: signed in at once; pt2 is linked by the trigger, stranger is a staff e-mail nobody added
-      if (email === 'pt2@b.th' || email === 'stranger@b.th') { localStorage.setItem('mock_session', JSON.stringify({ user: { id: email === 'pt2@b.th' ? 'u-patient' : 'u-new' } }));
-        return { data: { user: { identities: [{}] }, session: {} }, error: null }; }
-      return { data: { user: { identities: [{}] }, session: null }, error: null }; },
-    async signOut() { localStorage.removeItem('mock_session'); },
-    async getSession() { return { data: { session: sess() } }; } } };
-}`;
+const { chromium } = loadPlaywright();
+const server = await startServer();
+const { base } = server;
 const browser = await chromium.launch();
-const ctx = await browser.newContext();
-await ctx.route('**/config.js', (r) => r.fulfill({ contentType: 'text/javascript', body: 'window.APP_CONFIG={SUPABASE_URL:"http://x",SUPABASE_ANON_KEY:"k"}' }));
-await ctx.route('**/cdn.jsdelivr.net/**', (r) => r.fulfill({ contentType: 'text/javascript', body: MOCK_SUPABASE }));
-await ctx.route('**/cdnjs.cloudflare.com/**', (r) => r.fulfill({ contentType: 'text/javascript', body: 'window.Chart=function(c,cfg){if(window.__chartThrow)throw new Error("bad chart data");(window.__charts=window.__charts||[]).push(cfg)}' }));
+const ctx = await newMockedContext(browser);
 const page = await ctx.newPage();
 const errors = []; page.on('pageerror', (e) => errors.push(e.message));
 const results = [];
@@ -121,6 +62,9 @@ await check('register: an account the trigger linked goes straight into the app'
 await check('correct password reaches app (approved account, no pending notice)', async () => {
   await page.fill('#email', 'a@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html'); await page.waitForSelector('#panel table');
   assert.equal(await page.locator('#pending').count(), 0); });
+await check('app bar shows the account role', async () => { assert.equal(await page.textContent('#role-chip'), 'ผู้ดูแลระบบ'); });
+await check('clicking the icon inside a nav button switches tab', async () => {
+  await page.click('[data-tab=views] svg'); await page.waitForSelector('#v'); await page.click('[data-tab=data] svg'); await page.waitForSelector('#panel table'); });
 await check('CRUD list shows patient row', async () => { assert.ok((await page.textContent('#panel table')).includes('HN1')); });
 await check('delete patient with dependents shows Thai FK error', async () => {
   const del = page.locator('#panel button', { hasText: 'ลบ' }).first(); await del.click(); await page.locator('#panel button', { hasText: 'ยืนยันลบ?' }).click();
@@ -128,6 +72,46 @@ await check('delete patient with dependents shows Thai FK error', async () => {
 await check('add patient with missing required field is blocked', async () => {
   await page.click('#new'); await page.fill('#f_hn', 'HN9'); await page.click('#form button[type=submit]');
   await page.waitForFunction(() => document.querySelector('#err').textContent.includes('กรุณากรอก')); });
+await check('drawer: title, error inside it, Escape closes and focus returns to the add button', async () => {
+  assert.equal(await page.textContent('#form h2'), 'เพิ่มผู้ป่วย');
+  assert.ok((await page.textContent('#form-err')).includes('กรุณากรอก'));
+  await page.keyboard.press('Escape'); await page.waitForSelector('#form', { state: 'hidden' });
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'new'); });
+await check('status select shows Thai labels with database values', async () => {
+  await page.selectOption('#t', 'booking'); await page.click('#new');
+  assert.deepEqual(await page.$$eval('#f_status option', (o) => o.slice(1).map((x) => [x.value, x.textContent])),
+    [['pending', 'รอยืนยัน'], ['confirmed', 'ยืนยันแล้ว'], ['completed', 'เสร็จสิ้น'], ['cancelled', 'ยกเลิก']]);
+  await page.click('#form .drawer-foot button[type=button]'); await page.waitForSelector('#form', { state: 'hidden' });
+  await page.selectOption('#t', 'patient'); await page.waitForSelector('#list table'); });
+await check('drawer: Escape works after clicking a non-focusable part; the page behind is inert while open', async () => {
+  await page.click('#new'); await page.click('#form h2');
+  assert.equal(await page.$eval('#panel .card', (e) => e.inert), true); assert.equal(await page.$eval('#panel .zone-sign', (e) => e.inert), true);
+  await page.keyboard.press('Escape'); await page.waitForSelector('#form', { state: 'hidden' });
+  assert.equal(await page.$eval('#panel .card', (e) => e.inert), false); });
+await check('after saving an edit, focus lands on a control, not the page body', async () => {
+  await page.locator('#list button', { hasText: 'แก้ไข' }).first().click(); await page.click('#form button[type=submit]');
+  await page.waitForSelector('#form', { state: 'hidden' }); await page.waitForSelector('#list table');
+  assert.equal(await page.evaluate(() => document.activeElement.id), 'new'); });
+await check('a slow save does not close a drawer the user opened afterwards', async () => {
+  await page.evaluate(() => { window.__slowWrite = 600; });
+  await page.locator('#list button', { hasText: 'แก้ไข' }).first().click(); await page.click('#form button[type=submit]');
+  await page.keyboard.press('Escape'); await page.waitForSelector('#form', { state: 'hidden' });
+  await page.click('#new'); await page.fill('#f_hn', 'HN-NEW');
+  await page.waitForSelector('#toasts .toast'); await page.waitForTimeout(200);
+  assert.equal(await page.isVisible('#form'), true, 'new drawer still open'); assert.equal(await page.inputValue('#f_hn'), 'HN-NEW');
+  assert.equal(await page.textContent('#form h2'), 'เพิ่มผู้ป่วย');
+  assert.equal(await page.textContent('#toasts .toast >> nth=-1'), 'บันทึกการแก้ไขแล้ว');
+  await page.keyboard.press('Escape'); await page.waitForSelector('#form', { state: 'hidden' }); });
+await check('phone width: row actions are icon-only so the data columns keep the room; an armed delete shows its words', async () => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const w = await page.evaluate(() => { const wrap = document.querySelector('#list .tablewrap'); const last = wrap.querySelector('tbody td:last-child');
+    return last.getBoundingClientRect().width / wrap.getBoundingClientRect().width; });
+  assert.ok(w < 0.4, 'actions column takes ' + Math.round(w * 100) + '%');
+  const del = page.locator('#list button', { hasText: 'ลบ' }).first();
+  const labelWidth = () => del.locator('.label').evaluate((e) => e.getBoundingClientRect().width);
+  assert.ok(await labelWidth() <= 1, 'word hidden visually (kept for screen readers)');
+  await del.click(); assert.ok(await labelWidth() > 20, 'armed: word shown'); assert.equal(await del.locator('.label').textContent(), 'ยืนยันลบ?');
+  await page.waitForTimeout(4100); await page.setViewportSize({ width: 1280, height: 720 }); });
 await check('duplicate booking shows Thai duplicate error', async () => {
   await page.selectOption('#t', 'booking'); await page.click('#new');
   await page.fill('#f_patient_id', '1'); await page.fill('#f_staff_id', '1'); await page.fill('#f_booking_date', '2026-11-20'); await page.fill('#f_booking_time', '09:00'); await page.fill('#f_queue_no', '1'); await page.selectOption('#f_status', 'pending');
@@ -135,11 +119,29 @@ await check('duplicate booking shows Thai duplicate error', async () => {
 await check('views page shows rows, and ไม่พบข้อมูล for an empty view', async () => {
   await page.click('[data-tab=views]'); await page.selectOption('#v', 'v_top_diagnosis'); await page.waitForSelector('#out table');
   await page.selectOption('#v', 'v_feedback_summary'); await page.waitForFunction(() => document.getElementById('out').textContent.includes('ไม่พบข้อมูล')); });
+await check('views: report names in Thai, grouped by zone; status shown as a badge', async () => {
+  await page.click('[data-tab=views]'); await page.selectOption('#v', 'v_inventory_stock_status'); await page.waitForSelector('#out table');
+  assert.equal(await page.textContent('#v option[value=v_inventory_stock_status]'), 'สถานะสต็อกยา (v_inventory_stock_status)');
+  assert.deepEqual(await page.$$eval('#v optgroup', (g) => g.map((x) => x.label)), ['นัดหมาย', 'เวชระเบียน', 'เภสัชกรรม']);
+  assert.equal(await page.getAttribute('#out .badge', 'data-tone'), 'danger'); assert.equal(await page.textContent('#out .badge'), 'ต้องสั่งด่วน');
+  assert.equal(await page.textContent('.zone-sign strong'), 'เภสัชกรรม'); });
+await check('table search hides rows and updates the count', async () => {
+  await page.click('[data-tab=dash]'); await page.click('[data-tab=data]'); await page.waitForSelector('#list table');
+  await page.fill('#list .table-search', 'ไม่มีใครชื่อนี้');
+  assert.equal(await page.locator('#list tbody tr:visible').count(), 0); assert.equal(await page.textContent('#list .table-count'), 'แสดง 0 จาก 1 รายการ');
+  await page.fill('#list .table-search', 'hn1'); assert.equal(await page.locator('#list tbody tr:visible').count(), 1);
+  assert.equal(await page.textContent('#list .table-count'), 'แสดง 1 จาก 1 รายการ'); });
+await check('table search ignores the actions column', async () => {
+  await page.fill('#list .table-search', 'แก้ไข'); assert.equal(await page.locator('#list tbody tr:visible').count(), 0);
+  await page.fill('#list .table-search', ''); });
 const headings = () => page.$$eval('#panel h3', (h) => h.map((x) => x.textContent));
 await check('admin dashboard draws all 5 staff charts in order', async () => {
   await page.evaluate(() => { window.__charts = []; });
   await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 5);
   assert.deepEqual((await headings()).map((h) => h.slice(0, 2)), ['D1', 'D2', 'D3', 'D4', 'D5']);
+  assert.deepEqual(await page.$$eval('#panel .chart-card', (c) => c.map((x) => x.style.getPropertyValue('--zone').trim())), ['var(--z-appt)', 'var(--z-rec)', 'var(--z-rx)', 'var(--z-rec)', 'var(--z-rx)']);
+  const spans = () => page.$$eval('#panel .chart-card', (c) => c.map((x) => getComputedStyle(x).gridColumnEnd === '-1'));
+  assert.deepEqual(await spans(), [false, true, false, false, false], 'only D2 (monthly billing) spans the full width');
   assert.equal(await page.textContent('#page-desc'), 'กราฟตามหน้าที่ของบัญชีนี้ ผู้ดูแลระบบเห็นทุกกราฟ');
   const c = await page.evaluate(() => window.__charts.map((x) => ({ labels: x.data.labels, data: x.data.datasets.map((d) => d.data) })));
   assert.deepEqual(c[1].data[0], [150]);
@@ -150,10 +152,13 @@ await check('app header shows the Thai time zone', async () => {
 await check('chat: answer, SQL evidence and raw table are shown; input disabled while processing', async () => {
   await page.click('[data-tab=chat]'); await page.fill('#q', 'มีแพทย์กี่คน'); await page.click('#send');
   assert.equal(await page.isDisabled('#send'), true); assert.ok((await page.textContent('#log')).includes('กำลังประมวลผล'));
+  assert.equal(await page.locator('#log .msg.bot.pending .dot').count(), 3);
   await page.waitForFunction(() => document.querySelector('#log').textContent.includes('มีแพทย์ 8 คน'));
   assert.ok((await page.textContent('#log')).includes('มีแพทย์กี่คน'));
   assert.ok((await page.textContent('#log details')).includes('select count(*)'));
   assert.ok((await page.textContent('#log table')).includes('8')); assert.equal(await page.isDisabled('#send'), false); });
+await check('chat: example chip fills the question box', async () => {
+  await page.click('#ex button >> nth=0'); assert.equal(await page.inputValue('#q'), 'แพทย์คนไหนมีคิวจองมากที่สุด'); await page.fill('#q', ''); });
 await check('chat: refused dangerous question shows the reason and no table', async () => {
   await page.fill('#q', 'ลบข้อมูลผู้ป่วยทั้งหมด'); await page.click('#send');
   await page.waitForFunction(() => document.querySelector('#log').textContent.includes('อนุญาตเฉพาะคำสั่ง SELECT'));
@@ -199,6 +204,7 @@ await check('patient account: own-record tables only, book with a doctor list, n
   await page.fill('#email', 'pt@b.th'); await page.fill('#password', 'secret1'); await page.click('#login'); await page.waitForURL('**/app.html*');
   await page.waitForSelector('#t'); assert.equal(await page.locator('#pending').count(), 0);
   assert.equal(await page.textContent('#page-title'), 'ข้อมูลของฉัน');
+  assert.equal(await page.textContent('#role-chip'), 'ผู้ป่วย');
   assert.deepEqual(await page.$$eval('#t option', (o) => o.map((x) => x.value)), ['patient', 'booking', 'visit', 'prescription']);
   assert.equal(await page.isVisible('#new'), false, 'patients cannot add patient rows');
   await page.selectOption('#t', 'visit'); await page.waitForSelector('#list table');
@@ -211,7 +217,8 @@ await check('patient account: own-record tables only, book with a doctor list, n
   assert.equal(await page.locator('#f_queue_no, #f_patient_id, #f_status').count(), 0, 'set by the database');
   await page.selectOption('#f_staff_id', '7'); await page.fill('#f_booking_date', '2099-01-02'); await page.fill('#f_booking_time', '10:30');
   await page.click('#form button[type=submit]'); await page.waitForSelector('#form', { state: 'hidden' });
-  assert.deepEqual(await page.evaluate(() => window.__lastInsert), { staff_id: 7, booking_date: '2099-01-02', booking_time: '10:30', symptom: null }); });
+  assert.deepEqual(await page.evaluate(() => window.__lastInsert), { staff_id: 7, booking_date: '2099-01-02', booking_time: '10:30', symptom: null });
+  await page.waitForSelector('#toasts .toast'); assert.equal(await page.textContent('#toasts .toast'), 'เพิ่มข้อมูลแล้ว'); });
 await check('patient: no reports tab, own-billing dashboard', async () => {
   assert.equal(await page.isVisible('[data-tab=views]'), false);
   assert.deepEqual(await page.$$eval('#nav button', (b) => b.filter((x) => !x.hidden).map((x) => x.dataset.tab)), ['data', 'dash', 'chat']);
@@ -236,7 +243,8 @@ const loginAs = async (email) => {
 await check('pharmacist dashboard shows only D5 then D3', async () => {
   await loginAs('ph@b.th'); await page.evaluate(() => { window.__charts = []; });
   await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 2);
-  assert.deepEqual(await headings(), ['D5 ใบสั่งยารอคัดกรอง แยกตามสถานะ', 'D3 ยาที่ต่ำกว่าจุดสั่งซื้อ']); });
+  assert.deepEqual(await headings(), ['D5 ใบสั่งยารอคัดกรอง แยกตามสถานะ', 'D3 ยาที่ต่ำกว่าจุดสั่งซื้อ']);
+  assert.deepEqual(await page.$$eval('#panel .chart-card', (c) => c.map((x) => getComputedStyle(x).gridColumnEnd)), ['auto', 'auto'], 'D3 sits beside D5, not full width'); });
 await check('nurse dashboard: one failing chart does not block the other', async () => {
   await loginAs('ns@b.th'); await page.evaluate(() => { window.__charts = []; window.__failView = 'v_bed_occupancy'; });
   await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 1);

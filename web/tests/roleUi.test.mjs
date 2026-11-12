@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { tabsFor, chartsFor, ALL_TABS, STAFF_CHARTS } from '../js/roleUi.js';
+import { tabsFor, chartsFor, roleLabel, ALL_TABS, STAFF_CHARTS } from '../js/roleUi.js';
 
 test('patient has no reports tab; staff and unknown get every tab', () => {
   assert.deepEqual(tabsFor({ patient: true }), ['data', 'dash', 'chat']);
@@ -20,4 +20,10 @@ test('unknown or missing role falls back to the admin set', () => {
 test('returned arrays are copies', () => {
   chartsFor('admin').push('x'); tabsFor().push('x'); chartsFor('doctor').push('x');
   assert.equal(chartsFor('admin').length, 5); assert.equal(tabsFor().length, 4); assert.equal(chartsFor('doctor').length, 2);
+});
+test('roleLabel', () => {
+  assert.equal(roleLabel({ linked: true, role: 'admin' }), 'ผู้ดูแลระบบ'); assert.equal(roleLabel({ linked: true, role: 'doctor' }), 'แพทย์');
+  assert.equal(roleLabel({ linked: true, role: 'nurse' }), 'พยาบาล'); assert.equal(roleLabel({ linked: true, role: 'pharmacist' }), 'เภสัชกร');
+  assert.equal(roleLabel({ linked: true, patient: true, role: 'patient' }), 'ผู้ป่วย'); assert.equal(roleLabel({ linked: true, role: null }), 'เจ้าหน้าที่');
+  assert.equal(roleLabel({ linked: false }), 'รอผูกบัญชี');
 });
