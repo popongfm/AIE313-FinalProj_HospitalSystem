@@ -287,7 +287,17 @@ table.has-actions th:last-child, table.has-actions td:last-child { position: sti
 table.has-actions th:last-child::before, table.has-actions td:last-child::before {
   content: ""; position: absolute; top: 0; bottom: 0; left: -12px; width: 12px; pointer-events: none;
   background: linear-gradient(to left, var(--col-shadow), transparent); }
-@media (max-width: 720px) { td button { padding: 0 10px; font-size: 13px; } .search-field { flex-basis: 100%; } }
+@media (max-width: 720px) {
+  .search-field { flex-basis: 100%; }
+  /* phones: row actions show their icon only (the word stays for screen readers), so the data columns keep the room;
+     an armed delete/cancel shows its words, so "ยืนยันลบ?" is never a silent second tap */
+  td button { width: var(--h-sm); padding: 0; }
+  td button .label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  td button[data-armed="1"] { width: auto; padding: 0 10px; font-size: 13px; }
+  td button[data-armed="1"] .label { position: static; width: auto; height: auto; overflow: visible; clip: auto; }
+  td { height: 44px; }
+  table.has-actions th:last-child, table.has-actions td:last-child { padding-left: 8px; padding-right: 8px; }
+}
 table.has-actions th:last-child { background: var(--mist); z-index: 2; }
 table.has-actions tbody tr:hover td:last-child { background: color-mix(in srgb, var(--scrub-soft), var(--paper) 45%); }
 .empty { display: flex; flex-direction: column; align-items: center; gap: var(--s2); color: var(--muted); padding: var(--s7) var(--s6); text-align: center;
@@ -333,8 +343,8 @@ pre { overflow-x: auto; background: var(--paper); border: 1px solid var(--line);
 .chart-card { border-top: 4px solid var(--zone); }
 .chart-card h3 { font-size: 17px; margin-bottom: var(--s4); }
 .chart-box { position: relative; height: 280px; }
-.charts .card:nth-child(2) .chart-box { height: 320px; }
-.charts .card:nth-child(2) { grid-column: 1 / -1; }
+.charts .chart-card[data-chart="billing"] .chart-box { height: 320px; }
+.charts .chart-card[data-chart="billing"] { grid-column: 1 / -1; }   /* the monthly billing chart (D2) needs the width, whatever the role's chart order */
 
 @media (max-width: 720px) {
   .app-bar { padding: 8px 16px 0; gap: 4px 12px; }

@@ -37,7 +37,8 @@ export async function mountCrudPage(el, access = {}) {
   el.prepend(sign);
   let editing = null;   // row being edited, or null for insert
   let opener = null;    // the button that opened the drawer gets focus back when it closes
-  let saving = false;
+  let openId = 0;       // each opening of the drawer gets a number; a save only closes the drawer it was made from
+  let savingId = -1;    // the opening whose save is still running
   const options = {};   // source name -> [{ value, label }], loaded once
   const can = (cfg, what) => !cfg.readOnly && cfg[what] !== false;
   // form errors show next to the fields, and in the page's message line (#err) as before
@@ -78,7 +79,7 @@ export async function mountCrudPage(el, access = {}) {
     restoreFocus();
   }
   async function openForm(row, from) {
-    editing = row; opener = from || null; const cfg = tables[sel.value];
+    editing = row; opener = from || null; openId++; const cfg = tables[sel.value];
     try { await loadSources(cfg); } catch (e) { err.textContent = friendlyError(e); return; }
     title.textContent = (row ? 'แก้ไข' : 'เพิ่ม') + cfg.label;
     body.replaceChildren(...cfg.cols.map((c) => field(c, row ? row[c.name] : null)));
@@ -148,19 +149,23 @@ export async function mountCrudPage(el, access = {}) {
     if (document.activeElement === document.body) { opener = null; restoreFocus(); }
   }
   form.addEventListener('submit', async (e) => {
-    e.preventDefault(); if (saving) return;   // one save at a time
-    const cfg = tables[sel.value];
+    e.preventDefault();
+    const id = openId; if (savingId === id) return;   // one save per drawer
+    const cfg = tables[sel.value], table = sel.value, target = editing;
     const { row, missing } = coerceRow(cfg, Object.fromEntries(new FormData(form)));
     if (missing.length) { showError('กรุณากรอกให้ถูกต้อง: ' + missing.map((m) => cfg.cols.find((c) => c.name === m).label).join(', ')); return; }
     const submit = form.querySelector('button[type=submit]'), label = submit.querySelector('.label').textContent;
-    saving = true; submit.disabled = true; setLabel(submit, 'กำลังบันทึก…');
-    const q = editing ? supabase.from(sel.value).update(row).eq(cfg.pk, editing[cfg.pk]) : supabase.from(sel.value).insert(row);
+    savingId = id; submit.disabled = true; setLabel(submit, 'กำลังบันทึก…');
+    const q = target ? supabase.from(table).update(row).eq(cfg.pk, target[cfg.pk]) : supabase.from(table).insert(row);
     const { error } = await q;
-    saving = false; submit.disabled = false; setLabel(submit, label);
-    if (error) { showError(friendlyError(error)); return; }
-    const wasEdit = !!editing;
-    closeForm(); err.textContent = ''; toast(wasEdit ? 'บันทึกการแก้ไขแล้ว' : 'เพิ่มข้อมูลแล้ว'); await load();
-    if (document.activeElement === document.body) restoreFocus();   // the edit button that opened the drawer was rebuilt
+    if (savingId === id) savingId = -1;
+    const current = id === openId && !form.hidden;   // false: the user closed this drawer (or opened another) while it saved
+    if (current) { submit.disabled = false; setLabel(submit, label); }
+    if (error) { if (current) showError(friendlyError(error)); else err.textContent = friendlyError(error); return; }
+    toast(target ? 'บันทึกการแก้ไขแล้ว' : 'เพิ่มข้อมูลแล้ว');
+    if (current) { closeForm(); err.textContent = ''; }
+    if (sel.value === table) await load(true);
+    if (current && document.activeElement === document.body) restoreFocus();   // the edit button that opened the drawer was rebuilt
   });
   close.addEventListener('click', closeForm);
   backdrop.addEventListener('click', closeForm);

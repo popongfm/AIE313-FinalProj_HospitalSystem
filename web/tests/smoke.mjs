@@ -92,6 +92,26 @@ await check('after saving an edit, focus lands on a control, not the page body',
   await page.locator('#list button', { hasText: 'แก้ไข' }).first().click(); await page.click('#form button[type=submit]');
   await page.waitForSelector('#form', { state: 'hidden' }); await page.waitForSelector('#list table');
   assert.equal(await page.evaluate(() => document.activeElement.id), 'new'); });
+await check('a slow save does not close a drawer the user opened afterwards', async () => {
+  await page.evaluate(() => { window.__slowWrite = 600; });
+  await page.locator('#list button', { hasText: 'แก้ไข' }).first().click(); await page.click('#form button[type=submit]');
+  await page.keyboard.press('Escape'); await page.waitForSelector('#form', { state: 'hidden' });
+  await page.click('#new'); await page.fill('#f_hn', 'HN-NEW');
+  await page.waitForSelector('#toasts .toast'); await page.waitForTimeout(200);
+  assert.equal(await page.isVisible('#form'), true, 'new drawer still open'); assert.equal(await page.inputValue('#f_hn'), 'HN-NEW');
+  assert.equal(await page.textContent('#form h2'), 'เพิ่มผู้ป่วย');
+  assert.equal(await page.textContent('#toasts .toast >> nth=-1'), 'บันทึกการแก้ไขแล้ว');
+  await page.keyboard.press('Escape'); await page.waitForSelector('#form', { state: 'hidden' }); });
+await check('phone width: row actions are icon-only so the data columns keep the room; an armed delete shows its words', async () => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  const w = await page.evaluate(() => { const wrap = document.querySelector('#list .tablewrap'); const last = wrap.querySelector('tbody td:last-child');
+    return last.getBoundingClientRect().width / wrap.getBoundingClientRect().width; });
+  assert.ok(w < 0.4, 'actions column takes ' + Math.round(w * 100) + '%');
+  const del = page.locator('#list button', { hasText: 'ลบ' }).first();
+  const labelWidth = () => del.locator('.label').evaluate((e) => e.getBoundingClientRect().width);
+  assert.ok(await labelWidth() <= 1, 'word hidden visually (kept for screen readers)');
+  await del.click(); assert.ok(await labelWidth() > 20, 'armed: word shown'); assert.equal(await del.locator('.label').textContent(), 'ยืนยันลบ?');
+  await page.waitForTimeout(4100); await page.setViewportSize({ width: 1280, height: 720 }); });
 await check('duplicate booking shows Thai duplicate error', async () => {
   await page.selectOption('#t', 'booking'); await page.click('#new');
   await page.fill('#f_patient_id', '1'); await page.fill('#f_staff_id', '1'); await page.fill('#f_booking_date', '2026-11-20'); await page.fill('#f_booking_time', '09:00'); await page.fill('#f_queue_no', '1'); await page.selectOption('#f_status', 'pending');
@@ -120,6 +140,8 @@ await check('admin dashboard draws all 5 staff charts in order', async () => {
   await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 5);
   assert.deepEqual((await headings()).map((h) => h.slice(0, 2)), ['D1', 'D2', 'D3', 'D4', 'D5']);
   assert.deepEqual(await page.$$eval('#panel .chart-card', (c) => c.map((x) => x.style.getPropertyValue('--zone').trim())), ['var(--z-appt)', 'var(--z-rec)', 'var(--z-rx)', 'var(--z-rec)', 'var(--z-rx)']);
+  const spans = () => page.$$eval('#panel .chart-card', (c) => c.map((x) => getComputedStyle(x).gridColumnEnd === '-1'));
+  assert.deepEqual(await spans(), [false, true, false, false, false], 'only D2 (monthly billing) spans the full width');
   assert.equal(await page.textContent('#page-desc'), 'กราฟตามหน้าที่ของบัญชีนี้ ผู้ดูแลระบบเห็นทุกกราฟ');
   const c = await page.evaluate(() => window.__charts.map((x) => ({ labels: x.data.labels, data: x.data.datasets.map((d) => d.data) })));
   assert.deepEqual(c[1].data[0], [150]);
@@ -221,7 +243,8 @@ const loginAs = async (email) => {
 await check('pharmacist dashboard shows only D5 then D3', async () => {
   await loginAs('ph@b.th'); await page.evaluate(() => { window.__charts = []; });
   await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 2);
-  assert.deepEqual(await headings(), ['D5 ใบสั่งยารอคัดกรอง แยกตามสถานะ', 'D3 ยาที่ต่ำกว่าจุดสั่งซื้อ']); });
+  assert.deepEqual(await headings(), ['D5 ใบสั่งยารอคัดกรอง แยกตามสถานะ', 'D3 ยาที่ต่ำกว่าจุดสั่งซื้อ']);
+  assert.deepEqual(await page.$$eval('#panel .chart-card', (c) => c.map((x) => getComputedStyle(x).gridColumnEnd)), ['auto', 'auto'], 'D3 sits beside D5, not full width'); });
 await check('nurse dashboard: one failing chart does not block the other', async () => {
   await loginAs('ns@b.th'); await page.evaluate(() => { window.__charts = []; window.__failView = 'v_bed_occupancy'; });
   await page.click('[data-tab=dash]'); await page.waitForFunction(() => window.__charts.length === 1);

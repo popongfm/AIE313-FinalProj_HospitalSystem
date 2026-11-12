@@ -16,7 +16,7 @@ function loadChartJs() {
 }
 // one card per chart, with the colour of the chart's department on top
 function card(el, title, id) {
-  const c = document.createElement('div'); c.className = 'card chart-card'; c.style.setProperty('--zone', zoneFor(id).color);
+  const c = document.createElement('div'); c.className = 'card chart-card'; c.style.setProperty('--zone', zoneFor(id).color); c.dataset.chart = id;
   c.innerHTML = '<h3></h3><div class="empty" hidden></div><div class="chart-box"><canvas></canvas></div>'; c.querySelector('h3').textContent = title;
   c.querySelector('.empty').append(icon('chart', 'empty-icon'), document.createTextNode('ไม่พบข้อมูล'));
   el.appendChild(c); return c;

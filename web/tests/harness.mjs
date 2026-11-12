@@ -30,7 +30,8 @@ export function createClient() {
   const qb = (table) => { const st = { op: 'select', filters: [] };
     const b = { select() { return b; }, maybeSingle() { st.single = true; return b; }, order() { return b; }, limit() { return b; }, eq(k, v) { st.filters.push([k, v]); return b; },
       insert(row) { st.op = 'insert'; st.row = row; window.__lastInsert = row; return b; }, update() { st.op = 'update'; return b; }, delete() { st.op = 'delete'; return b; },
-      then(res) { if (window.__failView === table) return res({ data: null, error: { code: '42P01', message: 'relation does not exist' } });
+      then(res) { if (window.__slowWrite && st.op !== 'select') { const ms = window.__slowWrite; window.__slowWrite = 0; return setTimeout(() => b.then(res), ms); }   // a save that takes a while
+        if (window.__failView === table) return res({ data: null, error: { code: '42P01', message: 'relation does not exist' } });
         if (st.op === 'insert' && table === 'booking' && st.row.queue_no != null) return res({ data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' } });
         if (st.op === 'delete' && table === 'patient') return res({ data: null, error: { code: '23503', message: 'violates foreign key' } });
         if (st.op === 'insert') { DB[table] = [...(DB[table] || []), st.row]; return res({ data: null, error: null }); }
