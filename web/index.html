@@ -4,15 +4,18 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>โรงพยาบาล AIE313 - เข้าสู่ระบบ</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Serif+Thai:wght@500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/app.css">
   <script src="config.js"></script>
+  <script>/* scroll reveal is opt-in: see js/motion.js */
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) { document.documentElement.classList.add('js-motion'); setTimeout(function () { if (!window.__motion) document.documentElement.classList.remove('js-motion'); }, 2500); }
+  </script>
 </head>
 <body class="site">
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <div class="utility">
     <div class="wrap">
       <span>ข้อมูลผู้ป่วยและบุคลากรในระบบนี้เป็นข้อมูลจำลองเพื่อการเรียนการสอน</span>
-      <span id="tz-clock"></span>
       <a href="https://github.com/popongfm/AIE313-FinalProj_HospitalSystem">ดูโค้ดบน GitHub</a>
     </div>
   </div>
@@ -20,7 +23,7 @@
   <header class="site-bar">
     <div class="wrap">
       <a class="brand" href="index.html" aria-label="โรงพยาบาล AIE313 หน้าแรก">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z"/></svg>
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10"/><path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z"/></svg>
         <span class="brand-name">โรงพยาบาล AIE313<small>ระบบสารสนเทศโรงพยาบาล</small></span>
       </a>
       <nav class="site-nav" aria-label="เมนูหลัก">
@@ -36,110 +39,91 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <h1>ทุกขั้นตอนของผู้ป่วย<br>อยู่ในระบบเดียว</h1>
-          <p>ตั้งแต่จองคิวพบแพทย์ บันทึกการรักษา จนถึงจ่ายยา แพทย์ พยาบาล และเภสัชกรทำงานบนข้อมูลชุดเดียวกัน และถามข้อมูลเป็นภาษาไทยได้ด้วยผู้ช่วย AI</p>
-          <a class="text-link" href="#services">ดูว่าระบบทำอะไรได้บ้าง</a>
+          <span class="live-chip" data-reveal>ผู้ช่วย AI พร้อมตอบคำถามเป็นภาษาไทย</span>
+          <h1 data-reveal style="--i:1">ทุกขั้นตอนของผู้ป่วย<br>อยู่ในระบบเดียว</h1>
+          <p data-reveal style="--i:2">ตั้งแต่จองคิวพบแพทย์ บันทึกการรักษา จนถึงจ่ายยา แพทย์ พยาบาล และเภสัชกรทำงานบนข้อมูลชุดเดียวกัน และถามข้อมูลเป็นภาษาไทยได้ด้วยผู้ช่วย AI</p>
+          <div class="hero-cta" data-reveal style="--i:3">
+            <a class="btn primary" href="register.html">สมัครสมาชิก</a>
+            <a class="btn glass" href="#services">ดูว่าระบบทำอะไรได้บ้าง</a>
+          </div>
         </div>
+        <figure class="portrait" data-reveal style="--i:2">
+          <img src="img/doctor.jpg" alt="" width="900" height="1200" onerror="this.remove()">
+        </figure>
+      </div>
+    </section>
 
-        <div class="hero-side">
-        <!-- floor plan behind the sign-in card: the login is the entrance -->
-        <svg class="plan" viewBox="0 0 640 600" aria-hidden="true">
-          <g class="walls">
-            <path d="M8 270V8h624v584H8V330"/>
-            <path d="M210 8v84M420 8v84M8 92H68M104 92H254M290 92H470M506 92H632"/>
-            <path d="M180 500v92M430 500v92M8 500H60M96 500H290M326 500H520M556 500H632"/>
-            <path d="M8 270H118M8 330H118M560 92v408"/>
-          </g>
-          <g class="beds"><rect x="196" y="516" width="40" height="20" rx="3"/><rect x="246" y="516" width="40" height="20" rx="3"/><rect x="326" y="516" width="40" height="20" rx="3"/><rect x="376" y="516" width="40" height="20" rx="3"/>
-            <rect x="584" y="130" width="32" height="12" rx="2"/><rect x="584" y="170" width="32" height="12" rx="2"/><rect x="584" y="210" width="32" height="12" rx="2"/><rect x="584" y="250" width="32" height="12" rx="2"/></g>
-          <g class="rooms">
-            <text x="109" y="58">OPD</text><text x="315" y="58">ห้องปฏิบัติการ</text><text x="526" y="58">เวชระเบียน</text>
-            <text x="94" y="552">ER</text><text x="306" y="552">IPD</text><text x="531" y="552">รังสีวิทยา</text>
-          </g>
-          <path class="route" d="M8 300h110"/>
-        </svg>
-        <span class="you-are-here" aria-hidden="true">คุณอยู่ที่นี่</span>
-
-        <div class="hero-card" id="signin">
-          <h2>เข้าสู่ระบบ</h2>
+    <section class="signin-band" aria-labelledby="signin-title">
+      <div class="wrap signin-grid">
+        <div data-reveal>
+          <h2>เข้าใช้งานด้วยบัญชีของคุณ</h2>
+          <p class="lead">เข้าสู่ระบบด้วยอีเมลที่สมัครไว้ ระบบจะเปิดเมนูให้ตามสิทธิ์ของคุณ ทั้งผู้ป่วย แพทย์ พยาบาล เภสัชกร และผู้ดูแลระบบ</p>
+        </div>
+        <div class="signin-card" id="signin" data-reveal data-glow style="--i:1">
+          <h2 id="signin-title">เข้าสู่ระบบ</h2>
           <form id="form">
-            <label for="email">อีเมล</label><input id="email" type="email" required autocomplete="username">
-            <label for="password">รหัสผ่าน</label><input id="password" type="password" required minlength="6" autocomplete="current-password">
+            <label for="email">อีเมล</label><input id="email" type="email" required autocomplete="username" placeholder="name@example.com">
+            <label for="password">รหัสผ่าน</label>
+            <div class="pw-field">
+              <input id="password" type="password" required minlength="6" autocomplete="current-password" placeholder="อย่างน้อย 6 ตัวอักษร">
+              <button type="button" class="ghost sm" id="toggle-pw" aria-pressed="false" aria-controls="password">แสดง</button>
+            </div>
             <div id="err" class="err" role="alert"></div>
             <div id="ok" class="ok" role="status"></div>
-            <div class="row">
-              <button class="primary" type="submit" id="login">เข้าสู่ระบบ</button>
-              <a class="btn" id="signup" href="register.html">สมัครสมาชิก</a>
-            </div>
-            <p class="hint">ยังไม่มีบัญชี? สมัครได้ทั้งผู้ป่วยและเจ้าหน้าที่ ระบบผูกบัญชีกับข้อมูลของคุณให้อัตโนมัติ</p>
+            <button class="primary" type="submit" id="login">เข้าสู่ระบบ</button>
+            <p class="hint">ยังไม่มีบัญชี? <a id="signup" href="register.html">สมัครสมาชิก</a> ได้ทั้งผู้ป่วยและเจ้าหน้าที่ ระบบผูกบัญชีกับข้อมูลของคุณให้อัตโนมัติ</p>
           </form>
-        </div>
         </div>
       </div>
     </section>
 
-    <nav class="quick" aria-label="ทางลัดเข้าระบบ">
-      <div class="wrap">
-        <ul>
-          <li><a href="app.html#data">
-            <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="7" y="5" width="18" height="23" rx="2"/><path d="M12 5V3h8v2M11 13h10M11 18h10M11 23h6"/></svg>
-            <span><strong>ข้อมูลผู้ป่วยและคิวนัด</strong>เพิ่ม แก้ไข และลบข้อมูล 6 ตาราง</span></a></li>
-          <li><a href="app.html#views">
-            <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="6" width="22" height="20" rx="2"/><path d="M5 12h22M12 12v14M5 19h22"/></svg>
-            <span><strong>รายงาน</strong>10 รายงานจากฐานข้อมูล</span></a></li>
-          <li><a href="app.html#dash">
-            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27h22M9 23V15M16 23V8M23 23v-5"/></svg>
-            <span><strong>Dashboard</strong>คิวแพทย์ ค่ารักษา และสต็อกยา</span></a></li>
-          <li><a href="app.html#chat">
-            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M6 8h20v13H14l-6 5v-5H6z"/><path d="M11 13h10M11 17h6"/></svg>
-            <span><strong>ถามผู้ช่วย AI</strong>พิมพ์คำถามเป็นภาษาไทย</span></a></li>
-        </ul>
-      </div>
-    </nav>
-
     <section class="band" id="services">
       <div class="wrap">
-        <h2>บริการในระบบ</h2>
-        <p class="lead">ระบบแบ่งงานตามแผนกของโรงพยาบาล ทุกส่วนใช้ข้อมูลผู้ป่วยและบุคลากรชุดเดียวกัน</p>
+        <h2 data-reveal>บริการในระบบ</h2>
+        <p class="lead" data-reveal style="--i:1">ระบบแบ่งงานตามแผนกของโรงพยาบาล ทุกส่วนใช้ข้อมูลผู้ป่วยและบุคลากรชุดเดียวกัน</p>
         <div class="signs">
-          <article class="sign" style="--zone: var(--z-appt)">
-            <header>
-              <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="7" width="22" height="20" rx="3"/><path d="M5 13h22M11 4v6M21 4v6"/><circle cx="16" cy="20" r="3.5"/></svg>
+          <article class="sign" style="--zone: var(--z-appt)" data-reveal data-glow>
+            <div class="sign-media">
+              <img loading="lazy" src="img/appointments.jpg" alt="" onerror="this.remove()">
+              <span class="sign-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="5" y="7" width="22" height="20" rx="3"/><path d="M5 13h22M11 4v6M21 4v6"/><circle cx="16" cy="20" r="3.5"/></svg></span>
               <h3>คิวนัดหมาย<span lang="en">Appointments</span></h3>
-            </header>
+            </div>
             <ul>
               <li>จองคิวพบแพทย์ตามวันและเวลา</li>
               <li>ระบบไม่ให้จองแพทย์คนเดิมซ้ำในเวลาเดียวกัน</li>
               <li>ดูคิววันนี้และภาระงานของแพทย์แต่ละคน</li>
             </ul>
           </article>
-          <article class="sign" style="--zone: var(--z-rec)">
-            <header>
-              <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="7" y="5" width="18" height="23" rx="2"/><path d="M12 5V3h8v2M11 13h10M11 18h10M11 23h6"/></svg>
+          <article class="sign" style="--zone: var(--z-rec); --i:1" data-reveal data-glow>
+            <div class="sign-media">
+              <img loading="lazy" src="img/records.jpg" alt="" onerror="this.remove()">
+              <span class="sign-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="7" y="5" width="18" height="23" rx="2"/><path d="M12 5V3h8v2M11 13h10M11 18h10M11 23h6"/></svg></span>
               <h3>เวชระเบียน<span lang="en">Medical records</span></h3>
-            </header>
+            </div>
             <ul>
               <li>บันทึกการเข้ารับบริการ OPD, IPD และ ER</li>
               <li>การวินิจฉัยตามรหัส ICD และผลแล็บ</li>
               <li>อัตราการใช้เตียงและค่ารักษาแยกตามแผนก</li>
             </ul>
           </article>
-          <article class="sign" style="--zone: var(--z-rx)">
-            <header>
-              <svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="11" width="24" height="10" rx="5" transform="rotate(-40 16 16)"/><path d="M12.2 11.6l7.6 9"/></svg>
+          <article class="sign" style="--zone: var(--z-rx); --i:2" data-reveal data-glow>
+            <div class="sign-media">
+              <img loading="lazy" src="img/pharmacy.jpg" alt="" onerror="this.remove()">
+              <span class="sign-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><rect x="4" y="11" width="24" height="10" rx="5" transform="rotate(-40 16 16)"/><path d="M12.2 11.6l7.6 9"/></svg></span>
               <h3>เภสัชกรรม<span lang="en">Pharmacy</span></h3>
-            </header>
+            </div>
             <ul>
               <li>ใบสั่งยาและคิวคัดกรองของเภสัชกร</li>
               <li>แสดงประวัติแพ้ยาของผู้ป่วยก่อนจ่ายยา</li>
               <li>สต็อกยาแยกตามล็อตและวันหมดอายุ</li>
             </ul>
           </article>
-          <article class="sign" style="--zone: var(--z-rep)">
-            <header>
-              <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27h22M9 23V15M16 23V8M23 23v-5"/></svg>
+          <article class="sign" style="--zone: var(--z-rep); --i:3" data-reveal data-glow>
+            <div class="sign-media">
+              <img loading="lazy" src="img/reports.jpg" alt="" onerror="this.remove()">
+              <span class="sign-icon"><svg viewBox="0 0 32 32" aria-hidden="true"><path d="M5 27h22M9 23V15M16 23V8M23 23v-5"/></svg></span>
               <h3>รายงาน<span lang="en">Reports</span></h3>
-            </header>
+            </div>
             <ul>
               <li>รายงาน 10 ชุดดึงจากฐานข้อมูลโดยตรง</li>
               <li>Dashboard คิวแพทย์ ค่ารักษา และยาที่ต้องสั่งเพิ่ม</li>
@@ -150,34 +134,68 @@
       </div>
     </section>
 
-    <section class="band ai" id="ai">
-      <div class="wrap ai-grid">
-        <div>
-          <h2>ถามข้อมูลเป็นภาษาไทยได้เลย</h2>
-          <p class="lead">พิมพ์คำถามแบบที่ถามเพื่อนร่วมงาน ผู้ช่วย AI จะค้นจากรายงานของระบบ แล้วตอบพร้อมหลักฐานให้ตรวจสอบได้</p>
-          <ul class="checks">
-            <li>อ่านข้อมูลได้อย่างเดียว แก้ไขหรือลบข้อมูลไม่ได้</li>
-            <li>ค้นได้เฉพาะรายงาน 10 ชุด ซึ่งไม่มีเลขบัตรประชาชน เบอร์โทร หรืออีเมลของผู้ป่วย</li>
-            <li>ทุกคำตอบแสดง SQL และตารางข้อมูลที่ใช้</li>
-          </ul>
+    <section class="organs" aria-labelledby="organs-title">
+      <div class="wrap">
+        <h2 id="organs-title" data-reveal>ข้อมูลทางคลินิกที่ฐานข้อมูลเก็บ</h2>
+        <p class="lead" data-reveal style="--i:1">ทุกครั้งที่ผู้ป่วยเข้ารับบริการ ระบบบันทึกการวินิจฉัย ผลตรวจ และการรักษาไว้กับเวชระเบียนเดียวกัน</p>
+        <div class="organ-row">
+          <article class="organ" data-reveal data-glow>
+            <img loading="lazy" src="img/organ-brain.jpg" alt="" onerror="this.remove()">
+            <h3>การวินิจฉัย<span>ตามรหัส ICD พร้อมอันดับโรคที่พบบ่อย</span></h3>
+          </article>
+          <article class="organ" data-reveal data-glow style="--i:1">
+            <img loading="lazy" src="img/organ-heart.jpg" alt="" onerror="this.remove()">
+            <h3>การเข้ารับบริการ<span>OPD, IPD และ ER พร้อมเตียงและค่ารักษา</span></h3>
+          </article>
+          <article class="organ deep" data-reveal data-glow style="--i:2">
+            <img loading="lazy" src="img/organ-dna.jpg" alt="" onerror="this.remove()">
+            <h3>ผลตรวจทางห้องปฏิบัติการ<span>ผูกกับการเข้ารับบริการแต่ละครั้ง</span></h3>
+          </article>
         </div>
-        <figure class="sample" aria-label="ตัวอย่างการถามผู้ช่วย AI">
-          <figcaption>ตัวอย่าง</figcaption>
-          <div class="msg user">วันนี้มีคิวนัดกี่คิว</div>
-          <div class="msg bot"><div>วันนี้มีคิวนัดทั้งหมด 12 คิว</div><details open><summary>SQL ที่ใช้</summary><pre>SELECT count(*) AS queues
+      </div>
+    </section>
+
+    <section class="ai" id="ai">
+      <div class="ai-panel" data-reveal>
+        <div class="wrap ai-grid">
+          <div>
+            <h2>ถามข้อมูลเป็นภาษาไทยได้เลย</h2>
+            <p class="lead">พิมพ์คำถามแบบที่ถามเพื่อนร่วมงาน ผู้ช่วย AI จะค้นจากรายงานของระบบ แล้วตอบพร้อมหลักฐานให้ตรวจสอบได้</p>
+            <ul class="checks">
+              <li>อ่านข้อมูลได้อย่างเดียว แก้ไขหรือลบข้อมูลไม่ได้</li>
+              <li>ค้นได้เฉพาะรายงาน 10 ชุด ซึ่งไม่มีเลขบัตรประชาชน เบอร์โทร หรืออีเมลของผู้ป่วย</li>
+              <li>ทุกคำตอบแสดง SQL และตารางข้อมูลที่ใช้</li>
+            </ul>
+          </div>
+          <div class="ai-stage">
+            <figure class="ai-orb" aria-hidden="true">
+              <img loading="lazy" src="img/ai-brain.jpg" alt="" onerror="this.remove()">
+            </figure>
+            <figure class="sample" aria-label="ตัวอย่างการถามผู้ช่วย AI">
+              <figcaption>ตัวอย่าง</figcaption>
+              <div class="msg user">วันนี้มีคิวนัดกี่คิว</div>
+              <div class="msg bot"><div>วันนี้มีคิวนัดทั้งหมด 12 คิว</div><details open><summary>SQL ที่ใช้</summary><pre>SELECT count(*) AS queues
 FROM v_booking_queue_today
 LIMIT 100</pre></details></div>
-        </figure>
+              <div class="msg user">ยาอะไรต้องสั่งซื้อเพิ่ม</div>
+              <div class="msg bot"><div>มียา 3 รายการที่ต่ำกว่าจุดสั่งซื้อ เช่น Warfarin ล็อต L1 เหลือ 20 จากจุดสั่งซื้อ 100</div><details><summary>SQL ที่ใช้</summary><pre>SELECT generic_name, lot_number, quantity_on_hand, reorder_point
+FROM v_inventory_stock_status
+WHERE stock_status LIKE 'REORDER%'
+LIMIT 100</pre></details></div>
+              <p class="sample-more">ลองถามต่อได้ เช่น <span>แพทย์คนไหนมีคิวจองมากที่สุด</span><span>ค่ารักษารวมแยกตามแผนก</span></p>
+            </figure>
+          </div>
+        </div>
       </div>
     </section>
 
     <section class="band" id="access">
       <div class="wrap">
-        <h2>ขั้นตอนเข้าใช้งาน</h2>
+        <h2 data-reveal>ขั้นตอนเข้าใช้งาน</h2>
         <ol class="steps">
-          <li><strong>สมัครสมาชิก</strong><span>เลือกว่าเป็นผู้ป่วยหรือเจ้าหน้าที่ ผู้ป่วยกรอกเลขบัตรประชาชนและวันเกิด เจ้าหน้าที่ใช้อีเมลที่ผู้ดูแลระบบบันทึกไว้</span></li>
-          <li><strong>ระบบผูกบัญชีให้อัตโนมัติ</strong><span>ผู้ป่วยผูกกับเวชระเบียนเดิมหรือได้ HN ใหม่ เจ้าหน้าที่ผูกกับตำแหน่งของตน (แพทย์ พยาบาล เภสัชกร ผู้ดูแลระบบ)</span></li>
-          <li><strong>เข้าสู่ระบบ</strong><span>เห็นข้อมูล รายงาน Dashboard และใช้ผู้ช่วย AI ได้ตามสิทธิ์</span></li>
+          <li data-reveal><strong>สมัครสมาชิก</strong><span>เลือกว่าเป็นผู้ป่วยหรือเจ้าหน้าที่ ผู้ป่วยกรอกเลขบัตรประชาชนและวันเกิด เจ้าหน้าที่ใช้อีเมลที่ผู้ดูแลระบบบันทึกไว้</span><small>เลขบัตรประชาชนใช้เพื่อผูกบัญชีกับเวชระเบียนเดิมของคุณเท่านั้น และไม่แสดงในรายงานหรือคำตอบของผู้ช่วย AI</small></li>
+          <li data-reveal style="--i:1"><strong>ระบบผูกบัญชีให้อัตโนมัติ</strong><span>ผู้ป่วยผูกกับเวชระเบียนเดิมหรือได้ HN ใหม่ เจ้าหน้าที่ผูกกับตำแหน่งของตน (แพทย์ พยาบาล เภสัชกร ผู้ดูแลระบบ)</span></li>
+          <li data-reveal style="--i:2"><strong>เข้าสู่ระบบ</strong><span>เห็นข้อมูล รายงาน Dashboard และใช้ผู้ช่วย AI ได้ตามสิทธิ์</span></li>
         </ol>
       </div>
     </section>
@@ -186,10 +204,11 @@ LIMIT 100</pre></details></div>
   <footer class="site-foot">
     <div class="wrap">
       <span class="brand-name">โรงพยาบาล AIE313<small>ระบบสารสนเทศโรงพยาบาล</small></span>
-      <p>โปรเจกต์กลุ่ม รายวิชา AIE313 ระบบฐานข้อมูล มหาวิทยาลัยกรุงเทพ<br>ข้อมูลผู้ป่วยและบุคลากรทั้งหมดเป็นข้อมูลจำลอง</p>
+      <p>โปรเจกต์กลุ่ม รายวิชา AIE313 ระบบฐานข้อมูล มหาวิทยาลัยกรุงเทพ<br>ข้อมูลผู้ป่วยและบุคลากรทั้งหมดเป็นข้อมูลจำลอง ภาพประกอบจาก Unsplash<br><span id="tz-clock"></span></p>
     </div>
   </footer>
 
+  <script type="module" src="js/motion.js"></script>
   <script type="module">
     import { mountClock } from './js/clock.js';
     mountClock(document.getElementById('tz-clock'));
@@ -209,6 +228,12 @@ LIMIT 100</pre></details></div>
       } finally { $('login').disabled = false; }
     }
     $('form').addEventListener('submit', (e) => { e.preventDefault(); run(signIn); });
+    // show / hide the password
+    $('toggle-pw').addEventListener('click', () => {
+      const show = $('password').type === 'password';
+      $('password').type = show ? 'text' : 'password';
+      $('toggle-pw').textContent = show ? 'ซ่อน' : 'แสดง'; $('toggle-pw').setAttribute('aria-pressed', String(show));
+    });
   </script>
 </body>
 </html>

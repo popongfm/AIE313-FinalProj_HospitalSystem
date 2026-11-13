@@ -5,7 +5,7 @@ import { zoneFor } from './zones.js';
 import { icon } from './icons.js';
 import { chartsFor } from './roleUi.js';
 
-const PALETTE = ['#0f6b5e', '#9a5d0c', '#2f5d9e', '#74467f', '#6c7a86', '#b4232f'];   // same zone colours as css/app.css
+const PALETTE = ['#2a6fd6', '#0d8a86', '#b9740f', '#7557c9', '#7b8aa0', '#c2434e'];   // same zone colours as css/app.css
 function loadChartJs() {
   if (window.Chart) return Promise.resolve();
   return new Promise((ok, fail) => {
