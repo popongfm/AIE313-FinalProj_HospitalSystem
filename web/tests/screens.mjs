@@ -22,7 +22,7 @@ async function signIn(page, email) {
 for (const size of SIZES) {
   for (const colorScheme of ['light', 'dark']) {
     const { isMobile, ...viewport } = size;
-    const ctx = await newMockedContext(browser, { viewport, isMobile: !!isMobile, colorScheme, deviceScaleFactor: 1 });
+    const ctx = await newMockedContext(browser, { viewport, isMobile: !!isMobile, colorScheme, deviceScaleFactor: 1, reducedMotion: 'reduce' });   // reduced motion: scroll-reveal content is visible in full-page shots
     // CHARTJS_PATH=<chart.umd.js>: draw real charts instead of the test stub
     if (process.env.CHARTJS_PATH) await ctx.route('**/cdnjs.cloudflare.com/**', (r) => r.fulfill({ contentType: 'text/javascript', path: process.env.CHARTJS_PATH }));
     const page = await ctx.newPage();

@@ -4,15 +4,15 @@
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <title>โรงพยาบาล AIE313 - สมัครสมาชิก</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600&family=Noto+Serif+Thai:wght@500;600&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/app.css">
   <script src="config.js"></script>
 </head>
 <body class="site">
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
   <div class="utility">
     <div class="wrap">
       <span>ข้อมูลผู้ป่วยและบุคลากรในระบบนี้เป็นข้อมูลจำลองเพื่อการเรียนการสอน</span>
-      <span id="tz-clock"></span>
       <a href="https://github.com/popongfm/AIE313-FinalProj_HospitalSystem">ดูโค้ดบน GitHub</a>
     </div>
   </div>
@@ -20,7 +20,7 @@
   <header class="site-bar">
     <div class="wrap">
       <a class="brand" href="index.html" aria-label="โรงพยาบาล AIE313 หน้าแรก">
-        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7"/><path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z"/></svg>
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="10"/><path d="M13 7h6v6h6v6h-6v6h-6v-6H7v-6h6z"/></svg>
         <span class="brand-name">โรงพยาบาล AIE313<small>ระบบสารสนเทศโรงพยาบาล</small></span>
       </a>
       <a class="btn primary push-right" href="index.html#signin">เข้าสู่ระบบ</a>
@@ -28,7 +28,7 @@
   </header>
 
   <main class="register wrap">
-    <div class="reg-card">
+    <div class="reg-card" data-glow>
       <h1>สมัครสมาชิก</h1>
       <p class="lead">เลือกว่าคุณสมัครในฐานะใด ระบบจะผูกบัญชีกับข้อมูลของคุณในโรงพยาบาลให้อัตโนมัติ</p>
 
@@ -68,10 +68,11 @@
   <footer class="site-foot">
     <div class="wrap">
       <span class="brand-name">โรงพยาบาล AIE313<small>ระบบสารสนเทศโรงพยาบาล</small></span>
-      <p>โปรเจกต์กลุ่ม รายวิชา AIE313 ระบบฐานข้อมูล มหาวิทยาลัยกรุงเทพ<br>ข้อมูลผู้ป่วยและบุคลากรทั้งหมดเป็นข้อมูลจำลอง</p>
+      <p>โปรเจกต์กลุ่ม รายวิชา AIE313 ระบบฐานข้อมูล มหาวิทยาลัยกรุงเทพ<br>ข้อมูลผู้ป่วยและบุคลากรทั้งหมดเป็นข้อมูลจำลอง<br><span id="tz-clock"></span></p>
     </div>
   </footer>
 
+  <script type="module" src="js/motion.js"></script>
   <script type="module">
     import { mountClock } from './js/clock.js';
     mountClock(document.getElementById('tz-clock'));

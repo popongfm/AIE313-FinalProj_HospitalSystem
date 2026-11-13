@@ -6,7 +6,7 @@ import { extname, join } from 'node:path';
 
 export function loadPlaywright() { return createRequire(import.meta.url)(process.env.PLAYWRIGHT_PATH || 'playwright'); }
 const ROOT = new URL('..', import.meta.url).pathname;
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css' };
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.jpg': 'image/jpeg' };
 export function startServer() {
   const server = createServer(async (req, res) => {
     try { const p = join(ROOT, req.url.split('?')[0] === '/' ? 'index.html' : req.url.split('?')[0]); res.writeHead(200, { 'content-type': (MIME[extname(p)] || 'text/plain') + '; charset=utf-8' }); res.end(await readFile(p)); }
