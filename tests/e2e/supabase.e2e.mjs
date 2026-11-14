@@ -340,6 +340,8 @@ C = 'G chat-mcp: นัดหมายผ่าน AI (เสนอ → ยื�
   const c = await confirm('patient', p.action?.args);
   const mine = sql(`select count(*) from booking where staff_id = ${doc} and booking_date = '${day}' and booking_time = '09:40' and patient_id = ${PID} and status = 'pending'`);
   check(C, 'ผู้ป่วยกดยืนยันนัด', 'บันทึก 1 แถวเป็นของตัวเอง สถานะ pending', `${show(c)} ${c.answer?.slice(0, 30) ?? ''} แถว=${mine}`, !c.error && mine === '1');
+  const logged = sql(`select coalesce(answer, '') from chat_logs where user_id = '${U.patient.id}' and tool_name = 'mcp:confirm_booking' order by chat_id desc limit 1`);
+  check(C, 'chat_logs เก็บคำตอบของการยืนยันนัด', 'answer = ข้อความที่ผู้ใช้เห็น', logged.slice(0, 40), !!c.answer && logged === c.answer);
   const again = await confirm('patient', p.action?.args);
   check(C, 'กดยืนยันซ้ำ (เวลาเดิม)', 'ปฏิเสธ ไม่บันทึกซ้ำ', show(again), !!again.error && nAt('09:40') === '1');
 

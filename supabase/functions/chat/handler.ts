@@ -9,7 +9,20 @@ export type Deps = {
 export type ChatResult = { answer: string; sql: string; columns: string[]; rows: Row[]; error: string | null };
 const fail = (error: string, sql = ''): ChatResult => ({ answer: '', sql, columns: [], rows: [], error });
 
-export async function handleChat(deps: Deps, question: string, user: { id: string }): Promise<ChatResult> {
+
+// chat_logs.answer: what the user saw (the answer, or the error message). The handlers write their log entry once,
+// just before they return; this holds that entry back, adds the answer, then writes it.
+async function withAnswer<D extends { log(e: Record<string, unknown>): Promise<void> }>(deps: D, run: (d: D) => Promise<ChatResult>): Promise<ChatResult> {
+  let entry: Record<string, unknown> | null = null;
+  const result = await run({ ...deps, log: async (e: Record<string, unknown>) => { entry = e; } });
+  if (entry) await deps.log({ ...(entry as Record<string, unknown>), answer: (result.error ?? result.answer ?? '').slice(0, 4000) }).catch(() => {});
+  return result;
+}
+
+export function handleChat(deps: Deps, question: string, user: { id: string }): Promise<ChatResult> {
+  return withAnswer(deps, (d) => textToSqlChat(d, question, user));
+}
+async function textToSqlChat(deps: Deps, question: string, user: { id: string }): Promise<ChatResult> {
   const q = typeof question === 'string' ? question.trim() : '';
   if (q === '' || q.length > 500) return fail('กรุณาพิมพ์คำถาม (ไม่เกิน 500 ตัวอักษร)');
   const log = (e: Row) => deps.log({ user_id: user.id, question: q, ...e }).catch(() => {});

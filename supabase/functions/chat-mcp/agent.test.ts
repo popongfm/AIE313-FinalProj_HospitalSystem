@@ -171,3 +171,15 @@ test('an empty LLM reply is an LLM failure, not a crash', async () => {
   const r = await handleMcpChat({ llm: async () => undefined as unknown as AssistantMsg, runQuery: async () => [], log: async () => {} }, 'q', U);
   assert.match(r.error!, /ระบบ AI ไม่พร้อม/);
 });
+
+test('chat_logs gets the answer the user saw (answer, error message, confirmed booking)', async () => {
+  const ok = deps([call('aggregate_view', { view: 'v_visit_billing', group_by: ['department'], metrics: [{ fn: 'sum', column: 'total_amount' }] }), say('ค่ารักษารวมสูงสุดคือแผนก ก')]);
+  const r = await handleMcpChat(ok.d, 'ค่ารักษารวมแยกตามแผนก', U);
+  assert.equal(ok.logs.length, 1); assert.equal(ok.logs[0].answer, r.answer); assert.equal(ok.logs[0].question, 'ค่ารักษารวมแยกตามแผนก');
+  const bad = withActions([say('x'), say('y')]);
+  const e = await handleMcpChat(bad.d, 'มีหมอกี่คน', U);
+  assert.equal(bad.logs.length, 1); assert.equal(bad.logs[0].answer, e.error);
+  const c = withActions([]);
+  const saved = await confirmBooking(c.d, { doctor: '3', date: '2026-11-20', time: '10:00', hn: 'HN0005' }, { id: 'u1', role: 'nurse' });
+  assert.equal(c.logs.length, 1); assert.equal(c.logs[0].answer, saved.answer); assert.match(String(c.logs[0].answer), /บันทึกนัดแล้ว/);
+});

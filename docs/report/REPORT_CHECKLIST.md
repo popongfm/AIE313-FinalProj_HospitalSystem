@@ -6,13 +6,14 @@
 | 4 System Analysis | — | วาด Use Case หรือ Activity Diagram (ผู้ใช้: ผู้ป่วย แพทย์ เภสัชกร ผู้ดูแล) |
 | 5.1 แนวคิด/ภายนอก | `docs/er/*.mmd` | แต่ละคนอธิบาย entity/attribute/relationship ของส่วนตน |
 | 5.2 ER-Diagram | `docs/er/er_full.png`, `er_member_{A,B,C}_*.png`, `er_core_shared.png` | ใส่รูปและอธิบายตารางกลาง (patient, staff, department, visit) |
-| 5.3 Relational Schema | `schema.sql` (21 ตาราง) | แปลงเป็นตารางในรายงาน; A: booking, feedback · C: room, bed, visit, admission, diagnosis, lab_result, insurance_coverage, daily_charge · B: drug, drug_lot, prescription, prescription_item, dispense_record, inventory, drug_allergy_record · กลาง: department, staff, patient, profiles, chat_logs |
+| 5.3 Relational Schema | `schema.sql` (21 ตาราง) | แปลงเป็นตารางในรายงาน; A: booking, feedback · C: room, bed, visit, admission, diagnosis, lab_result, insurance_coverage, daily_charge · B: drug, drug_lot, prescription, prescription_item, dispense_record, inventory, drug_allergy_record · กลาง: department, staff, patient, chat_logs (บัญชีผูกด้วย `staff.user_id` / `patient.user_id` ไม่มีตาราง profiles แล้ว) |
 | 5.4 Normalization | ตัวอย่าง: `booking` (นัดหมาย) หรือ `visit`/`daily_charge` | เขียน 1NF→2NF→3NF อย่างน้อย 1 ตัวอย่าง |
 | 5.5 Views (≥6) | 10 views ใน `db/05_views.sql` | อธิบายแต่ละ view และ SQL |
 | 5.6 SQL Script | `schema.sql`, `seed.sql` | แนบไฟล์ |
 | 6 SQL วิเคราะห์ | `analysis/analysis_queries.sql` (19 คำสั่ง), `docs/report/analysis.md` | เติม "การแปลความหมาย" ทุกข้อ และจับภาพผลลัพธ์ |
 | 7 Web App | `web/` | ถ่ายภาพหน้าจอ Registration/Login/CRUD/Views/Dashboard จากระบบที่ deploy แล้ว (รวมข้อความ "ยังไม่ได้รับสิทธิ์" ของบัญชีที่เพิ่งสมัคร) |
 | 8 Chat | `supabase/functions/chat-mcp/` (หลัก, MCP วิธี C), `supabase/functions/chat/` (สำรอง, Text-to-SQL วิธี B), `docs/test-cases.md` | ระบุ LLM+รุ่นที่ใช้ (Groq `openai/gpt-oss-120b` ผ่าน secret `LLM_MODEL`), วาดแผนภาพสถาปัตยกรรม (Web → Edge Function → LLM → Supabase), ภาพหน้าจอ Chat |
+| Bonus: ประวัติ Chat | ตาราง `chat_logs` (`db/07_chat_support.sql`): ทุกคำถามบันทึก `question`, `answer` (คำตอบหรือข้อความ error ที่ผู้ใช้เห็น), `generated_sql`, `tool_name`, `row_count`, `error`, `created_at`; `user_id` เป็น FK ไป `auth.users` (ON DELETE SET NULL); RLS อ่านได้เฉพาะของตัวเอง | ภาพหน้าจอ `SELECT created_at, question, answer, tool_name FROM chat_logs ORDER BY created_at DESC LIMIT 10;` และนับเป็นหนึ่งในตาราง (อยู่ใน ER `er_core_shared`) |
 | 10 Testing | `docs/test-cases.md` | รันกรณี *todo* บนระบบจริง (รวมถามด้วย LLM จริง) |
 | 12 นำเสนอรายบุคคล | `docs/er/er_member_*.png` | คนละ ~5 นาที: ER, schema, normalization, views, SQL 1 ตัวอย่าง |
 | ส่งงาน | `schema.sql`, `seed.sql`, `analysis_queries.sql`, zip dataset, ลิงก์เว็บบน Render, ลิงก์ GitHub (และ Docker Hub), วิดีโอ ≤ 5 นาที | รายงาน PDF (TH Sarabun PSK 14pt), สไลด์ PDF รวมไฟล์เดียว, วิดีโอ |

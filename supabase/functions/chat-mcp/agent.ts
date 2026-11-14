@@ -59,7 +59,20 @@ const MAX_STEPS = 6;
 export const NUDGE = 'Reply only through the tools: call a data tool, propose_booking, or ask_user if you need to ask the user something. Do not answer in plain text.';
 const fail = (error: string): ChatResult => ({ answer: '', sql: '', columns: [], rows: [], error });
 
-export async function handleMcpChat(deps: AgentDeps, question: string, user: ChatUser, history: unknown = [], now = new Date()): Promise<ChatResult> {
+
+// chat_logs.answer: what the user saw (the answer, or the error message). The handlers write their log entry once,
+// just before they return; this holds that entry back, adds the answer, then writes it.
+async function withAnswer<D extends { log(e: Record<string, unknown>): Promise<void> }>(deps: D, run: (d: D) => Promise<ChatResult>): Promise<ChatResult> {
+  let entry: Record<string, unknown> | null = null;
+  const result = await run({ ...deps, log: async (e: Record<string, unknown>) => { entry = e; } });
+  if (entry) await deps.log({ ...(entry as Record<string, unknown>), answer: (result.error ?? result.answer ?? '').slice(0, 4000) }).catch(() => {});
+  return result;
+}
+
+export function handleMcpChat(deps: AgentDeps, question: string, user: ChatUser, history: unknown = [], now = new Date()): Promise<ChatResult> {
+  return withAnswer(deps, (d) => mcpChat(d, question, user, history, now));
+}
+async function mcpChat(deps: AgentDeps, question: string, user: ChatUser, history: unknown, now: Date): Promise<ChatResult> {
   const q = typeof question === 'string' ? question.trim() : '';
   if (q === '' || q.length > 500) return fail('กรุณาพิมพ์คำถาม (ไม่เกิน 500 ตัวอักษร)');
   const log = (e: Row) => deps.log({ user_id: user.id, question: q, ...e }).catch(() => {});
@@ -141,7 +154,10 @@ export async function handleMcpChat(deps: AgentDeps, question: string, user: Cha
 // The user pressed "ยืนยันนัด": save the proposed appointment. No LLM here. The arguments come back from the browser,
 // so they are checked again here and, above all, by chat_book_appointment, which acts as the signed-in user: editing
 // them in the browser cannot book anything that user could not book through the website anyway.
-export async function confirmBooking(deps: AgentDeps, raw: unknown, user: ChatUser): Promise<ChatResult> {
+export function confirmBooking(deps: AgentDeps, raw: unknown, user: ChatUser): Promise<ChatResult> {
+  return withAnswer(deps, (d) => saveBooking(d, raw, user));
+}
+async function saveBooking(deps: AgentDeps, raw: unknown, user: ChatUser): Promise<ChatResult> {
   const a = (raw ?? {}) as Record<string, unknown>;
   const str = (v: unknown, max: number) => typeof v === 'string' && v.trim() !== '' && v.length <= max;
   if (!deps.actions || !str(a.doctor, 100) || !str(a.date, 10) || !DATE_RE.test(String(a.date)) || !str(a.time, 5) || !TIME_RE.test(String(a.time))

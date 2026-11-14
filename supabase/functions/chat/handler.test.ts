@@ -56,3 +56,11 @@ test('rejects empty or oversized questions before calling anything', async () =>
   for (const q of ['', '   ', 'x'.repeat(501)]) { const r = await handleChat(d, q, user); assert.ok(r.error); }
   assert.equal(calls.run, 0);
 });
+test('chat_logs gets the answer the user saw (also the error message)', async () => {
+  const ok = deps();
+  const r = await handleChat(ok.d, 'แพทย์คนไหนมีคิวมากสุด', user);
+  assert.equal(ok.calls.logs.length, 1); assert.equal(ok.calls.logs[0].answer, r.answer);
+  const bad = deps({ generateSql: async () => 'DELETE FROM patient' });
+  const e = await handleChat(bad.d, 'ลบผู้ป่วย', user);
+  assert.equal(bad.calls.logs.length, 1); assert.equal(bad.calls.logs[0].answer, e.error);
+});
