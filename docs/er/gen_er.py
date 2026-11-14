@@ -38,9 +38,8 @@ def diagram(tables, title):
     # accounts: staff.user_id / patient.user_id -> auth.users (Supabase Auth); unique, so each account is one person row
     for ch, cc, p in fks:
         if p == 'users' and ch in tset and 'auth_users' in tset:
-            L.append('    auth_users ||--o| %s : "%s"' % (ch, cc))
-    if 'chat_logs' in tset and 'auth_users' in tset:   # logical link only: chat_logs.user_id has no FK
-        L.append('    auth_users ||..o{ chat_logs : "user_id (no FK)"')
+            L.append('    auth_users %s %s : "%s"' % ('|o--o{' if ch == 'chat_logs' else '||--o|', ch, cc))   # chat_logs: many per account
+
     return '\n'.join(L) + '\n'
 
 core = ['department','staff','patient','chat_logs','auth_users']

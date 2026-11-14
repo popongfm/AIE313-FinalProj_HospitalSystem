@@ -1,4 +1,5 @@
 -- Task 7: chat_logs, chat_reader role, run_readonly_query RPC.
+\i db/tests/helpers.sql
 DO $$
 DECLARE v text; n int;
   names text[] := ARRAY['v_booking_queue_today','v_upcoming_bookings','v_doctor_workload','v_feedback_summary','v_bed_occupancy','v_visit_billing',
@@ -78,7 +79,21 @@ DO $$ BEGIN
 EXCEPTION WHEN insufficient_privilege THEN NULL; END $$;
 RESET ROLE;
 
+-- chat_logs: history with the answer; user_id is a real foreign key (deleting the account keeps the row, unlinked)
+DO $$ BEGIN
+  ASSERT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'chat_logs' AND column_name = 'answer'), 'chat_logs.answer';
+  ASSERT (SELECT confrelid::regclass::text FROM pg_constraint WHERE conrelid = 'chat_logs'::regclass AND contype = 'f') = 'auth.users', 'chat_logs.user_id FK';
+  ASSERT (SELECT confdeltype FROM pg_constraint WHERE conrelid = 'chat_logs'::regclass AND contype = 'f') = 'n', 'ON DELETE SET NULL';
+END $$;
+SELECT pg_temp.expect_state($$INSERT INTO chat_logs(user_id, question) VALUES ('00000000-0000-0000-0000-0000000000ff', 'no such user')$$, '23503');
+INSERT INTO auth.users(id, email) VALUES ('00000000-0000-0000-0000-0000000000f9', 'gone@x.th');
+INSERT INTO chat_logs(user_id, question, answer) VALUES ('00000000-0000-0000-0000-0000000000f9', 'hist q', 'hist a');
+DELETE FROM auth.users WHERE id = '00000000-0000-0000-0000-0000000000f9';
+DO $$ BEGIN ASSERT (SELECT user_id IS NULL AND answer = 'hist a' FROM chat_logs WHERE question = 'hist q'), 'history kept, link removed'; END $$;
+DELETE FROM chat_logs WHERE question = 'hist q';
+
 -- chat_logs: a user writes and reads only their own rows; anon nothing
+INSERT INTO auth.users(id, email) VALUES ('00000000-0000-0000-0000-0000000000aa', 'aa@x.th'), ('00000000-0000-0000-0000-0000000000bb', 'bb@x.th') ON CONFLICT DO NOTHING;
 SELECT set_config('request.jwt.claim.sub', '00000000-0000-0000-0000-0000000000aa', true);
 SET LOCAL ROLE authenticated;
 DO $$ BEGIN
